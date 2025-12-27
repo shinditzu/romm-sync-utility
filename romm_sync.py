@@ -1,0 +1,975 @@
+#!/usr/bin/env python3
+"""
+RomM to RetroPie Metadata Sync
+
+Pulls metadata from a RomM server and generates EmulationStation gamelist.xml files
+for use with RetroPie.
+
+Usage:
+    python3 romm_sync.py --help
+    python3 romm_sync.py --server https://roms.proveaux.net --user admin --password secret
+"""
+
+import argparse
+import os
+import sys
+import time
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urljoin
+import requests
+from requests.auth import HTTPBasicAuth
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+# Target system configurations
+TARGET_CONFIGS = {
+    "retropie": {
+        "name": "RetroPie",
+        "gamelist_path": "./.emulationstation/gamelists",
+        "images_path": "~/.emulationstation/downloaded_images",
+        "roms_path": "~/RetroPie/roms",
+        "image_subdir": "",  # Images go directly in platform folder
+    },
+    "steamdeck": {
+        "name": "SteamDeck (ES-DE)",
+        "gamelist_path": "~/.emulationstation/gamelists",
+        "images_path": "~/.emulationstation/downloaded_media",
+        "roms_path": "~/Emulation/roms",
+        "image_subdir": "covers",  # ES-DE uses covers/ subdirectory
+    },
+    "emudeck": {
+        "name": "EmuDeck (SteamDeck)",
+        "gamelist_path": "~/.emulationstation/gamelists",
+        "images_path": "~/.emulationstation/downloaded_media",
+        "roms_path": "CUSTOM",  # User must specify with --rom-path
+        "image_subdir": "covers",  # ES-DE uses covers/ subdirectory
+    },
+}
+
+# Default gamelist output path (for backward compatibility)
+GAMELIST_OUTPUT_PATH = "./.emulationstation/gamelists"
+
+# Platform mapping: RomM platform slug -> EmulationStation folder name
+# Compatible with both RetroPie and ES-DE (SteamDeck)
+PLATFORM_MAP = {
+    "3do": "3do",
+    "amiga": "amiga",
+    "amstrad-cpc": "amstradcpc",
+    "arcade": "arcade",
+    "atari-2600": "atari2600",
+    "atari-5200": "atari5200",
+    "atari-7800": "atari7800",
+    "atari-jaguar": "atarijaguar",
+    "atari-lynx": "atarilynx",
+    "atari-st": "atarist",
+    "colecovision": "coleco",
+    "commodore-64": "c64",
+    "dreamcast": "dreamcast",
+    "famicom-disk-system": "fds",
+    "game-boy": "gb",
+    "game-boy-advance": "gba",
+    "game-boy-color": "gbc",
+    "game-gear": "gamegear",
+    "gamecube": "gc",
+    "genesis": "megadrive",
+    "intellivision": "intellivision",
+    "master-system": "mastersystem",
+    "mega-drive": "megadrive",
+    "msx": "msx",
+    "n64": "n64",
+    "neo-geo": "neogeo",
+    "neo-geo-cd": "neogeocd",
+    "neo-geo-pocket": "ngp",
+    "neo-geo-pocket-color": "ngpc",
+    "nes": "nes",
+    "nintendo-3ds": "3ds",
+    "nintendo-ds": "nds",
+    "nintendo-switch": "switch",
+    "pc-engine": "pcengine",
+    "pc-engine-cd": "pcenginecd",
+    "psx": "psx",
+    "ps2": "ps2",
+    "ps3": "ps3",
+    "psp": "psp",
+    "psvita": "psvita",
+    "saturn": "saturn",
+    "sega-32x": "sega32x",
+    "sega-cd": "segacd",
+    "snes": "snes",
+    "super-famicom": "snes",
+    "turbografx-16": "tg16",
+    "turbografx-cd": "tg-cd",
+    "vectrex": "vectrex",
+    "virtual-boy": "virtualboy",
+    "wii": "wii",
+    "wii-u": "wiiu",
+    "wonderswan": "wonderswan",
+    "wonderswan-color": "wonderswancolor",
+    "xbox": "xbox",
+    "xbox-360": "xbox360",
+    "zx-spectrum": "zxspectrum",
+    # ES-DE specific additions
+    "playstation": "psx",
+    "playstation-2": "ps2",
+    "playstation-3": "ps3",
+    "playstation-portable": "psp",
+    "playstation-vita": "psvita",
+}
+
+
+class RomMClient:
+    """Client for interacting with RomM API."""
+
+    def __init__(self, server_url: str, username: str, password: str):
+        self.server_url = server_url.rstrip("/")
+        self.auth = HTTPBasicAuth(username, password)
+        self.session = requests.Session()
+        self.session.auth = self.auth
+        
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=2,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
+    def _get(self, endpoint: str, params: dict = None, timeout: int = 120) -> dict:
+        """Make a GET request to the API."""
+        url = f"{self.server_url}/api{endpoint}"
+        response = self.session.get(url, params=params, timeout=timeout)
+        response.raise_for_status()
+        return response.json()
+
+    def get_platforms(self) -> list:
+        """Get all platforms from RomM."""
+        return self._get("/platforms")
+    
+    def get_collections(self) -> list:
+        """Get all collections from RomM."""
+        return self._get("/collections")
+    
+    def get_favorites_collection_id(self) -> int | None:
+        """Get the ID of the Favourites collection."""
+        collections = self.get_collections()
+        for collection in collections:
+            if 'favour' in collection.get('name', '').lower():
+                return collection.get('id')
+        return None
+    
+    def get_kid_friendly_collection_id(self) -> int | None:
+        """Get the ID of the Kid Friendly collection."""
+        collections = self.get_collections()
+        for collection in collections:
+            if 'kid' in collection.get('name', '').lower():
+                return collection.get('id')
+        return None
+    
+    def get_kid_friendly_rom_ids(self) -> set:
+        """Get set of ROM IDs that are in the Kid Friendly collection.
+        
+        Returns:
+            Set of ROM IDs marked as kid friendly.
+        """
+        collection_id = self.get_kid_friendly_collection_id()
+        if not collection_id:
+            return set()
+        
+        # Get all ROMs in the kid friendly collection
+        roms_response = self.get_roms(collection_id=collection_id, limit=10000)
+        if isinstance(roms_response, dict) and "items" in roms_response:
+            roms = roms_response["items"]
+        elif isinstance(roms_response, list):
+            roms = roms_response
+        else:
+            return set()
+        
+        return {rom.get('id') for rom in roms if rom.get('id')}
+
+    def get_roms(self, platform_id: int = None, limit: int = 1000, favorites_only: bool = False, collection_id: int = None) -> list:
+        """Get all ROMs for a platform.
+        
+        Args:
+            platform_id: Platform ID to get ROMs for. If None, gets all ROMs.
+            limit: Maximum number of ROMs to return.
+            favorites_only: If True, only return ROMs marked as favorites.
+            collection_id: Optional collection ID to filter by.
+        
+        Returns:
+            List of ROM dictionaries or dict with 'items' key.
+        """
+        params = {"limit": limit}
+        
+        if collection_id:
+            params["collection_id"] = collection_id
+        elif favorites_only:
+            # Use collection_id to filter favorites
+            collection_id = self.get_favorites_collection_id()
+            if collection_id:
+                params["collection_id"] = collection_id
+        
+        if platform_id is not None:
+            params["platform_id"] = platform_id
+            
+        return self._get("/roms", params=params, timeout=180)
+
+    def get_rom(self, rom_id: int) -> dict:
+        """Get detailed info for a specific ROM."""
+        return self._get(f"/roms/{rom_id}")
+
+    def get_cover_url(self, rom: dict) -> str | None:
+        """Get the cover image URL for a ROM."""
+        # Prefer external URL if available (IGDB, etc.)
+        if rom.get("url_cover"):
+            return rom["url_cover"]
+        # Fall back to local server if path exists
+        elif rom.get("path_cover_s") or rom.get("path_cover_l"):
+            return f"{self.server_url}/api/roms/{rom['id']}/cover/small"
+        return None
+
+    def get_screenshot_url(self, rom: dict) -> str | None:
+        """Get the screenshot URL for a ROM."""
+        # Similar to cover, prefer external URL
+        if rom.get("url_screenshot"):
+            return rom.get("url_screenshot")
+        
+        # Fall back to local server paths
+        if rom.get("path_screenshot_s"):
+            return f"{self.server_url}{rom['path_screenshot_s']}"
+        if rom.get("path_screenshot_l"):
+            return f"{self.server_url}{rom['path_screenshot_l']}"
+        
+        return None
+    
+    def get_rom_download_url(self, rom_id: int) -> str:
+        """Get the download URL for a ROM file."""
+        return f"{self.server_url}/api/roms/{rom_id}/content/download"
+    
+    def download_rom_file(self, rom: dict, output_path: Path) -> bool:
+        """Download a ROM file from RomM.
+        
+        Args:
+            rom: ROM dictionary with id and fs_name.
+            output_path: Path where the ROM file should be saved.
+        
+        Returns:
+            True if download succeeded, False otherwise.
+        """
+        rom_id = rom.get('id')
+        fs_name = rom.get('fs_name')
+        
+        if not rom_id or not fs_name:
+            return False
+        
+        download_url = self.get_rom_download_url(rom_id)
+        
+        try:
+            response = self.session.get(download_url, stream=True, timeout=300)
+            response.raise_for_status()
+            
+            # Write file in chunks
+            with open(output_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            return True
+        except Exception as e:
+            print(f"    Error downloading {fs_name}: {e}")
+            # Clean up partial download
+            if output_path.exists():
+                output_path.unlink()
+            return False
+
+
+def format_date(date_str: str | None) -> str:
+    """Convert date to EmulationStation format (YYYYMMDDTHHMMSS)."""
+    if not date_str:
+        return ""
+    try:
+        # Try parsing ISO format
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        return dt.strftime("%Y%m%dT%H%M%S")
+    except (ValueError, AttributeError):
+        return ""
+
+
+def create_gamelist_xml(roms: list, platform_slug: str, retropie_folder: str, rom_base_path: str = None, kid_friendly_rom_ids: set = None, target_config: dict = None) -> ET.Element:
+    """Create a gamelist.xml ElementTree from ROM data.
+    
+    Args:
+        roms: List of ROM dictionaries from RomM API.
+        platform_slug: RomM platform slug.
+        retropie_folder: RetroPie folder name for this platform.
+        rom_base_path: Optional base path for ROM files. If None, uses relative paths.
+        kid_friendly_rom_ids: Set of ROM IDs that should be marked as kid games.
+        target_config: Target system configuration dict (from TARGET_CONFIGS).
+    
+    Returns:
+        ElementTree root element for gamelist.xml.
+    """
+    root = ET.Element("gameList")
+    
+    if kid_friendly_rom_ids is None:
+        kid_friendly_rom_ids = set()
+    
+    # Use default RetroPie config if no target specified
+    if target_config is None:
+        target_config = TARGET_CONFIGS["retropie"]
+
+    for rom in roms:
+        game = ET.SubElement(root, "game")
+
+        # Path to the ROM file
+        filename = rom.get("fs_name", "") or rom.get("file_name", "")
+        rom_name = rom.get("name", "Unknown")
+        
+        # Use filename if available, otherwise use ROM name
+        if not filename:
+            filename = rom_name
+        
+        path_elem = ET.SubElement(game, "path")
+        if rom_base_path:
+            # Use custom base path (e.g., /romm/library/roms/snes/game.sfc)
+            path_elem.text = f"{rom_base_path}/{retropie_folder}/{filename}"
+        else:
+            # Use relative path (e.g., ./game.sfc)
+            path_elem.text = f"./{filename}"
+
+        # Game name
+        name_elem = ET.SubElement(game, "name")
+        name_elem.text = rom_name
+
+        # Description
+        if rom.get("summary"):
+            desc_elem = ET.SubElement(game, "desc")
+            desc_elem.text = rom.get("summary", "")
+
+        # Cover image
+        if rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l"):
+            image_elem = ET.SubElement(game, "image")
+            rom_id = rom.get("id", "unknown")
+            image_filename = f"{rom_id}-image.png"
+            
+            # Build image path based on target config
+            images_base = target_config["images_path"]
+            image_subdir = target_config["image_subdir"]
+            
+            if image_subdir:
+                image_elem.text = f"{images_base}/{retropie_folder}/{image_subdir}/{image_filename}"
+            else:
+                image_elem.text = f"{images_base}/{retropie_folder}/{image_filename}"
+
+        # Rating (convert from 0-100 to 0-1)
+        if rom.get("igdb_metadata", {}).get("total_rating"):
+            rating_elem = ET.SubElement(game, "rating")
+            rating = float(rom["igdb_metadata"]["total_rating"]) / 100.0
+            rating_elem.text = f"{rating:.2f}"
+
+        # Release date
+        first_release = rom.get("first_release_date")
+        if first_release:
+            date_elem = ET.SubElement(game, "releasedate")
+            date_elem.text = format_date(first_release)
+
+        # Developer
+        if rom.get("igdb_metadata", {}).get("developers"):
+            dev_elem = ET.SubElement(game, "developer")
+            dev_elem.text = ", ".join(rom["igdb_metadata"]["developers"])
+
+        # Publisher
+        if rom.get("igdb_metadata", {}).get("publishers"):
+            pub_elem = ET.SubElement(game, "publisher")
+            pub_elem.text = ", ".join(rom["igdb_metadata"]["publishers"])
+
+        # Genre
+        if rom.get("genres"):
+            genre_elem = ET.SubElement(game, "genre")
+            genre_elem.text = ", ".join(rom["genres"])
+
+        # Players
+        igdb_meta = rom.get("igdb_metadata", {})
+        if igdb_meta.get("game_modes"):
+            players_elem = ET.SubElement(game, "players")
+            modes = igdb_meta["game_modes"]
+            if "Multiplayer" in modes or "Co-operative" in modes:
+                players_elem.text = "4"
+            else:
+                players_elem.text = "1"
+        
+        # Kid game flag
+        rom_id = rom.get("id")
+        if rom_id and rom_id in kid_friendly_rom_ids:
+            kidgame_elem = ET.SubElement(game, "kidgame")
+            kidgame_elem.text = "true"
+
+    return root
+
+
+def prettify_xml(elem: ET.Element) -> str:
+    """Return a pretty-printed XML string."""
+    rough_string = ET.tostring(elem, encoding="unicode")
+    reparsed = minidom.parseString(rough_string)
+    return reparsed.toprettyxml(indent="  ")
+
+
+def parse_existing_gamelist(gamelist_path: Path) -> dict:
+    """Parse existing gamelist.xml to get previously synced games.
+    
+    Args:
+        gamelist_path: Path to the gamelist.xml file.
+    
+    Returns:
+        Dictionary mapping ROM names to their file paths and image paths.
+        Format: {rom_name: {'path': str, 'image': str}}
+    """
+    if not gamelist_path.exists():
+        return {}
+    
+    try:
+        tree = ET.parse(gamelist_path)
+        root = tree.getroot()
+        
+        existing_games = {}
+        for game in root.findall('game'):
+            name_elem = game.find('name')
+            path_elem = game.find('path')
+            image_elem = game.find('image')
+            
+            if name_elem is not None and name_elem.text:
+                game_info = {}
+                if path_elem is not None and path_elem.text:
+                    game_info['path'] = path_elem.text
+                if image_elem is not None and image_elem.text:
+                    game_info['image'] = image_elem.text
+                existing_games[name_elem.text] = game_info
+        
+        return existing_games
+    except Exception as e:
+        print(f"  Warning: Could not parse existing gamelist.xml: {e}")
+        return {}
+
+
+def remove_unfavorited_games(
+    current_roms: list,
+    existing_games: dict,
+    roms_path: Path,
+    images_path: Path,
+    dry_run: bool = False
+) -> tuple:
+    """Remove games that are no longer in the favorites list.
+    
+    Args:
+        current_roms: List of current ROM dictionaries from RomM.
+        existing_games: Dictionary of previously synced games from gamelist.xml.
+        roms_path: Path to the ROM files directory.
+        images_path: Path to the images directory.
+        dry_run: If True, only show what would be removed.
+    
+    Returns:
+        Tuple of (removed_roms_count, removed_images_count).
+    """
+    # Build set of current ROM names
+    current_rom_names = {rom.get('name') for rom in current_roms if rom.get('name')}
+    
+    # Find games that were previously synced but are no longer in current favorites
+    removed_games = {name: info for name, info in existing_games.items() 
+                     if name not in current_rom_names}
+    
+    if not removed_games:
+        return (0, 0)
+    
+    print(f"\n  Found {len(removed_games)} game(s) to remove (no longer favorited)")
+    
+    removed_roms = 0
+    removed_images = 0
+    
+    for game_name, game_info in removed_games.items():
+        if dry_run:
+            print(f"    [DRY RUN] Would remove: {game_name}")
+            continue
+        
+        print(f"    Removing: {game_name}")
+        
+        # Remove ROM file
+        rom_path_str = game_info.get('path', '')
+        if rom_path_str:
+            # Extract filename from path (handle both relative ./file.ext and absolute paths)
+            rom_filename = Path(rom_path_str).name
+            rom_file = roms_path / rom_filename
+            if rom_file.exists():
+                try:
+                    rom_file.unlink()
+                    removed_roms += 1
+                    print(f"      Deleted ROM: {rom_filename}")
+                except Exception as e:
+                    print(f"      Error deleting ROM {rom_filename}: {e}")
+        
+        # Remove image file
+        image_path_str = game_info.get('image', '')
+        if image_path_str:
+            # Extract filename from path
+            image_filename = Path(image_path_str).name
+            image_file = images_path / image_filename
+            if image_file.exists():
+                try:
+                    image_file.unlink()
+                    removed_images += 1
+                    print(f"      Deleted image: {image_filename}")
+                except Exception as e:
+                    print(f"      Error deleting image {image_filename}: {e}")
+    
+    return (removed_roms, removed_images)
+
+
+def download_image(client: RomMClient, rom: dict, dest_path: Path, max_retries: int = 3) -> bool:
+    """Download cover image for a ROM with retry logic."""
+    url = client.get_cover_url(rom)
+    if not url:
+        return False
+
+    for attempt in range(max_retries):
+        try:
+            # Use session for local server URLs, plain requests for external
+            is_local = url.startswith(client.server_url)
+            if is_local:
+                response = client.session.get(url, timeout=30)
+            else:
+                response = requests.get(url, timeout=30)
+            
+            response.raise_for_status()
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path.write_bytes(response.content)
+            return True
+        except requests.HTTPError as e:
+            if e.response.status_code == 401:
+                # 401 on external URLs means auth required - skip retries
+                if not url.startswith(client.server_url):
+                    return False
+                print(f"  Warning: 401 Auth error for {rom.get('name')} (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+            elif e.response.status_code == 404:
+                # 404 means image doesn't exist - no point retrying
+                return False
+            elif e.response.status_code == 429:
+                print(f"  Warning: Rate limited, waiting...")
+                time.sleep(5 * (attempt + 1))
+                continue
+            else:
+                return False
+        except requests.RequestException as e:
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return False
+    
+    return False
+
+
+def sync_platform(
+    client: RomMClient,
+    platform: dict,
+    gamelist_base_path: Path,
+    download_images: bool = True,
+    download_roms: bool = False,
+    dry_run: bool = False,
+    rom_base_path: str = None,
+    favorites_only: bool = False,
+    target_config: dict = None,
+) -> int:
+    """Sync a single platform from RomM to RetroPie.
+    
+    Args:
+        client: RomM API client.
+        platform: Platform dictionary from RomM.
+        gamelist_base_path: Base path for gamelist.xml output.
+        download_images: Whether to download cover images.
+        download_roms: Whether to download ROM files.
+        dry_run: If True, show what would be done without making changes.
+        rom_base_path: Optional base path for ROM files in gamelist.xml.
+        favorites_only: If True, only sync ROMs marked as favorites.
+        target_config: Target system configuration dict (from TARGET_CONFIGS).
+    
+    Returns:
+        Number of ROMs processed.
+    """
+    platform_slug = platform.get("slug", "")
+    platform_name = platform.get("name", platform_slug)
+
+    # Use default RetroPie config if no target specified
+    if target_config is None:
+        target_config = TARGET_CONFIGS["retropie"]
+
+    # Map to RetroPie folder name
+    retropie_folder = PLATFORM_MAP.get(platform_slug, platform_slug)
+    platform_path = gamelist_base_path / retropie_folder
+
+    print(f"\n{'='*60}")
+    print(f"Platform: {platform_name} ({platform_slug} -> {retropie_folder})")
+    print(f"{'='*60}")
+
+    # Get ROMs for this platform
+    try:
+        roms_response = client.get_roms(platform["id"], favorites_only=favorites_only)
+        if isinstance(roms_response, dict) and "items" in roms_response:
+            roms = roms_response["items"]
+        elif isinstance(roms_response, list):
+            roms = roms_response
+        else:
+            print(f"  Unexpected response format: {type(roms_response)}")
+            return 0
+    except requests.RequestException as e:
+        print(f"  Error fetching ROMs: {e}")
+        return 0
+
+    if not roms:
+        if favorites_only:
+            print("  No favorite ROMs found for this platform")
+        else:
+            print("  No ROMs found for this platform")
+        return 0
+
+    if favorites_only:
+        print(f"  Found {len(roms)} favorite ROMs")
+    else:
+        print(f"  Found {len(roms)} ROMs")
+    
+    # Debug: Show available fields from first ROM
+    if roms:
+        print("\n  DEBUG: Sample ROM data:")
+        first_rom = roms[0]
+        print(f"    ROM: {first_rom.get('name', 'N/A')}")
+        print(f"    fs_name: '{first_rom.get('fs_name', '')}'")
+        print(f"    favorite: {first_rom.get('favorite', False)}")
+        print(f"    url_cover: {first_rom.get('url_cover')}")
+        print(f"    path_cover_s: {first_rom.get('path_cover_s')}")
+        print(f"    path_cover_l: {first_rom.get('path_cover_l')}")
+        
+        # Show actual download URL that will be used
+        cover_url = client.get_cover_url(first_rom)
+        if cover_url:
+            is_external = not cover_url.startswith(client.server_url)
+            source = "external" if is_external else "local server"
+            print(f"    Download URL ({source}): {cover_url[:80]}..." if len(cover_url) > 80 else f"    Download URL ({source}): {cover_url}")
+        
+        # Count ROMs with covers
+        roms_with_covers = sum(1 for r in roms if r.get('url_cover') or r.get('path_cover_s') or r.get('path_cover_l'))
+        print(f"    ROMs with covers: {roms_with_covers}/{len(roms)}")
+        print()
+
+    if dry_run:
+        action_items = []
+        if download_roms:
+            action_items.append("download ROM files")
+        if download_images:
+            action_items.append("download images")
+        action_items.append("create gamelist.xml")
+        
+        print(f"\n  [DRY RUN] Would {', '.join(action_items)}")
+        for rom in roms[:5]:  # Show first 5
+            print(f"    - {rom.get('name', rom.get('file_name', 'Unknown'))}")
+        if len(roms) > 5:
+            print(f"    ... and {len(roms) - 5} more")
+        return len(roms)
+
+    # Create platform directory if needed
+    platform_path.mkdir(parents=True, exist_ok=True)
+    
+    # Use target-specific paths
+    home_dir = Path.home()
+    images_base = Path(target_config["images_path"].replace("~", str(home_dir)))
+    roms_base = Path(target_config["roms_path"].replace("~", str(home_dir)))
+    
+    # Build image path with optional subdirectory (e.g., covers/ for ES-DE)
+    if target_config["image_subdir"]:
+        images_path = images_base / retropie_folder / target_config["image_subdir"]
+    else:
+        images_path = images_base / retropie_folder
+    
+    roms_path = roms_base / retropie_folder
+    gamelist_path = platform_path / "gamelist.xml"
+    
+    # Parse existing gamelist to track previously synced games
+    existing_games = parse_existing_gamelist(gamelist_path)
+    if existing_games:
+        print(f"  Found {len(existing_games)} previously synced games")
+        
+        # Remove games that are no longer in favorites (only when syncing favorites)
+        if favorites_only:
+            removed_roms, removed_images = remove_unfavorited_games(
+                roms, existing_games, roms_path, images_path, dry_run
+            )
+            if removed_roms > 0 or removed_images > 0:
+                print(f"  Cleanup complete: {removed_roms} ROM(s) and {removed_images} image(s) removed")
+    if download_images:
+        images_path.mkdir(parents=True, exist_ok=True)
+        print("  Downloading cover images...")
+        downloaded = 0
+        skipped = 0
+        failed = 0
+        auth_errors = 0
+        not_found = 0
+        for i, rom in enumerate(roms):
+            has_cover = rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l")
+            if has_cover:
+                rom_id = rom.get("id", "unknown")
+                image_filename = f"{rom_id}-image.png"
+                image_path = images_path / image_filename
+                if not image_path.exists():
+                    if download_image(client, rom, image_path):
+                        downloaded += 1
+                        if downloaded <= 3:
+                            print(f"    {rom.get('name', 'Unknown')}")
+                    else:
+                        failed += 1
+                    
+                    # Rate limiting: small delay every 10 downloads
+                    if (i + 1) % 10 == 0:
+                        time.sleep(0.5)
+                else:
+                    skipped += 1
+        print(f"  Downloaded {downloaded} cover images (skipped {skipped} existing, {failed} failed)")
+        if failed > 0:
+            print(f"  Note: {failed} images failed to download (check auth or network issues)")
+        if downloaded == 0 and failed == 0 and skipped == 0:
+            print("  WARNING: No ROMs have cover images available")
+
+    # Download ROM files
+    if download_roms and not dry_run:
+        print("\n  Downloading ROM files...")
+        roms_path.mkdir(parents=True, exist_ok=True)
+        
+        downloaded = 0
+        skipped = 0
+        failed = 0
+        
+        for rom in roms:
+            fs_name = rom.get('fs_name')
+            if not fs_name:
+                failed += 1
+                continue
+            
+            dest_path = roms_path / fs_name
+            
+            # Skip if already exists
+            if dest_path.exists():
+                skipped += 1
+                continue
+            
+            # Download ROM file
+            print(f"    Downloading {fs_name}...")
+            if client.download_rom_file(rom, dest_path):
+                downloaded += 1
+            else:
+                failed += 1
+        
+        print(f"  Downloaded {downloaded} ROM files (skipped {skipped} existing, {failed} failed)")
+    
+    # Get kid friendly ROM IDs
+    kid_friendly_rom_ids = client.get_kid_friendly_rom_ids()
+    if kid_friendly_rom_ids:
+        kid_count = sum(1 for rom in roms if rom.get('id') in kid_friendly_rom_ids)
+        if kid_count > 0:
+            print(f"  Found {kid_count} kid-friendly ROMs in this platform")
+    
+    # Generate gamelist.xml
+    print("  Generating gamelist.xml...")
+    gamelist = create_gamelist_xml(roms, platform_slug, retropie_folder, rom_base_path, kid_friendly_rom_ids, target_config)
+    gamelist_path = platform_path / "gamelist.xml"
+
+    xml_content = prettify_xml(gamelist)
+    gamelist_path.write_text(xml_content, encoding="utf-8")
+    print(f"  Wrote {gamelist_path}")
+
+    return len(roms)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Sync ROM metadata from RomM to EmulationStation (RetroPie, SteamDeck ES-DE, etc.)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Sync all platforms (RetroPie)
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret
+
+  # Sync for SteamDeck with ES-DE
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --target steamdeck
+
+  # Sync specific platforms only
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --platforms snes,nes,gba
+
+  # Dry run (show what would be done)
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --dry-run
+
+  # Skip image downloads
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --no-images
+
+  # Use absolute ROM paths (shared filesystem with RomM)
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --rom-path /romm/library/roms
+
+  # Sync all ROMs (not just favorites)
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --all-roms
+
+  # Download ROM files along with metadata and images
+  python3 romm_sync.py -s https://roms.proveaux.net -u admin -p secret --download-roms
+        """,
+    )
+
+    parser.add_argument(
+        "-s", "--server",
+        required=True,
+        help="RomM server URL (e.g., https://roms.proveaux.net)",
+    )
+    parser.add_argument(
+        "-u", "--user",
+        required=True,
+        help="RomM username",
+    )
+    parser.add_argument(
+        "-p", "--password",
+        required=True,
+        help="RomM password",
+    )
+    parser.add_argument(
+        "--target",
+        choices=list(TARGET_CONFIGS.keys()),
+        default="retropie",
+        help="Target system (default: retropie). Options: " + ", ".join([f"{k} ({v['name']})" for k, v in TARGET_CONFIGS.items()]),
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default=None,
+        help="Gamelist output directory (overrides target default)",
+    )
+    parser.add_argument(
+        "--platforms",
+        help="Comma-separated list of platform slugs to sync (default: all)",
+    )
+    parser.add_argument(
+        "--no-images",
+        action="store_true",
+        help="Skip downloading cover images",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making changes",
+    )
+    parser.add_argument(
+        "--list-platforms",
+        action="store_true",
+        help="List available platforms and exit",
+    )
+    parser.add_argument(
+        "--rom-path",
+        help="Base path for ROM files in gamelist.xml (e.g., /run/media/deck/.../Emulation). Required for --target emudeck. If not specified, uses relative paths (./)",
+    )
+    parser.add_argument(
+        "--all-roms",
+        action="store_true",
+        help="Sync all ROMs (default: only favorites)",
+    )
+    parser.add_argument(
+        "--download-roms",
+        action="store_true",
+        help="Download ROM files from RomM server to ~/RetroPie/roms/{platform}/",
+    )
+
+    args = parser.parse_args()
+
+    # Get target configuration
+    target_config = TARGET_CONFIGS[args.target]
+    print(f"Target system: {target_config['name']}")
+    
+    # Validate emudeck target requires --rom-path
+    if args.target == "emudeck" and not args.rom_path:
+        print("\nError: --target emudeck requires --rom-path to specify your Emulation directory")
+        print("Example: --rom-path /run/media/deck/SDCARD/Emulation")
+        print("\nTo find your path, run: ls -la /run/media/deck/*/Emulation")
+        sys.exit(1)
+    
+    # Use target-specific gamelist path if not overridden
+    if args.output is None:
+        gamelist_output = target_config["gamelist_path"]
+    else:
+        gamelist_output = args.output
+
+    # Create client
+    print(f"Connecting to RomM server: {args.server}")
+    client = RomMClient(args.server, args.user, args.password)
+
+    # Test connection and get platforms
+    try:
+        platforms = client.get_platforms()
+    except requests.RequestException as e:
+        print(f"Error connecting to RomM server: {e}")
+        sys.exit(1)
+
+    print(f"Found {len(platforms)} platforms")
+    print("\nPlatform slugs found:")
+    for p in platforms:
+        print(f"  - {p.get('slug', 'N/A')} ({p.get('name', 'N/A')})")
+
+    # List platforms mode
+    if args.list_platforms:
+        print("\nAvailable platforms:")
+        for p in sorted(platforms, key=lambda x: x.get("name", "")):
+            slug = p.get("slug", "")
+            name = p.get("name", slug)
+            rom_count = p.get("rom_count", 0)
+            retropie_folder = PLATFORM_MAP.get(slug, slug)
+            print(f"  {slug:30} -> {retropie_folder:20} ({rom_count} ROMs) - {name}")
+        sys.exit(0)
+
+    # Filter platforms if specified
+    if args.platforms:
+        filter_slugs = [s.strip() for s in args.platforms.split(",")]
+        platforms = [p for p in platforms if p.get("slug") in filter_slugs]
+        if not platforms:
+            print(f"No matching platforms found for: {args.platforms}")
+            sys.exit(1)
+
+    # Sync each platform
+    gamelist_path = Path(gamelist_output).expanduser()
+    total_roms = 0
+
+    # Default to favorites only unless --all-roms is specified
+    favorites_only = not args.all_roms
+    
+    if favorites_only:
+        print("\n** Syncing FAVORITES only (use --all-roms to sync entire library) **\n")
+    else:
+        print("\n** WARNING: Syncing ALL ROMs (this may take a while) **\n")
+    
+    for platform in platforms:
+        count = sync_platform(
+            client,
+            platform,
+            gamelist_path,
+            download_images=not args.no_images,
+            download_roms=args.download_roms,
+            dry_run=args.dry_run,
+            rom_base_path=args.rom_path,
+            favorites_only=favorites_only,
+            target_config=target_config,
+        )
+        total_roms += count
+
+    print(f"\n{'='*60}")
+    print(f"Sync complete! Processed {total_roms} ROMs across {len(platforms)} platforms")
+    if args.dry_run:
+        print("(This was a dry run - no files were modified)")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()
