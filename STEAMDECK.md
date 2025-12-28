@@ -19,9 +19,37 @@ python3 romm_sync.py -s https://your-romm-server.com -u admin -p password --targ
 
 When using `--target steamdeck`, the script uses ES-DE standard paths:
 
-- **ROMs**: `~/Emulation/roms/{platform}/`
+- **ROMs**: `~/Emulation/roms/{platform}/` (internal storage) or custom path for SD card
 - **Gamelists**: `~/.emulationstation/gamelists/{platform}/gamelist.xml`
 - **Cover Images**: `~/.emulationstation/downloaded_media/{platform}/covers/`
+
+### ROM Path Detection
+
+**Auto-Detection (EmuDeck users):**
+If you have EmuDeck installed, the script will automatically detect your ROM path from `~/emudeck/settings.sh`. No need to specify `--rom-path`!
+
+**Manual Detection:**
+
+**Internal Storage (default):**
+```bash
+~/Emulation/roms/
+```
+
+**SD Card:**
+```bash
+# Find your SD card mount point
+ls -la /run/media/mmcblk0p1/Emulation/
+
+# Common SD card paths:
+# /run/media/mmcblk0p1/Emulation/roms/
+# /run/media/deck/SDCARD/Emulation/roms/
+```
+
+**Override Auto-Detection:**
+Use `--rom-path` to manually specify your Emulation directory:
+```bash
+--rom-path /run/media/mmcblk0p1/Emulation
+```
 
 ## Installation on SteamDeck
 
@@ -93,8 +121,15 @@ romm-sync -s https://your-server.com -u admin -p password --target steamdeck
 If you used the installer, use the wrapper script (handles venv automatically):
 
 ### Basic Sync (Favorites Only)
+
+**With EmuDeck (auto-detects ROM path):**
 ```bash
 ~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck
+```
+
+**Without EmuDeck or Custom Path:**
+```bash
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --rom-path /run/media/mmcblk0p1/Emulation
 ```
 
 ### Sync All ROMs (Warning: Large!)
@@ -103,8 +138,15 @@ If you used the installer, use the wrapper script (handles venv automatically):
 ```
 
 ### Download ROM Files
+
+**To Internal Storage:**
 ```bash
 ~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --download-roms
+```
+
+**To SD Card:**
+```bash
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --download-roms --rom-path /run/media/mmcblk0p1/Emulation
 ```
 
 ### Dry Run (Preview Changes)

@@ -19,6 +19,7 @@ from xml.dom import minidom
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
+import re
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter
@@ -686,7 +687,12 @@ def sync_platform(
     # Use target-specific paths
     home_dir = Path.home()
     images_base = Path(target_config["images_path"].replace("~", str(home_dir)))
-    roms_base = Path(target_config["roms_path"].replace("~", str(home_dir)))
+    
+    # Override roms_base if rom_base_path is provided
+    if rom_base_path:
+        roms_base = Path(rom_base_path.replace("~", str(home_dir))) / "roms"
+    else:
+        roms_base = Path(target_config["roms_path"].replace("~", str(home_dir)))
     
     # Build image path with optional subdirectory (e.g., covers/ for ES-DE)
     if target_config["image_subdir"]:
@@ -744,7 +750,7 @@ def sync_platform(
 
     # Download ROM files
     if download_roms and not dry_run:
-        print("\n  Downloading ROM files...")
+        print(f"\n  Downloading ROM files to: {roms_path}")
         roms_path.mkdir(parents=True, exist_ok=True)
         
         downloaded = 0
@@ -790,6 +796,39 @@ def sync_platform(
     print(f"  Wrote {gamelist_path}")
 
     return len(roms)
+
+
+def detect_emudeck_roms_path() -> str:
+    """Detect ROM path from EmuDeck settings if available.
+    
+    Returns:
+        Base Emulation path from EmuDeck settings, or None if not found.
+    """
+    emudeck_settings = Path.home() / "emudeck" / "settings.sh"
+    
+    if not emudeck_settings.exists():
+        print(f"  EmuDeck settings not found at: {emudeck_settings}")
+        return None
+    
+    try:
+        content = emudeck_settings.read_text()
+        # Look for romsPath variable (e.g., romsPath=/run/media/mmcblk0p1/Emulation/roms)
+        match = re.search(r'romsPath=["\']?([^"\';\n]+)', content)
+        if match:
+            roms_path = match.group(1).strip()
+            print(f"  Found romsPath in EmuDeck settings: {roms_path}")
+            # Extract base Emulation directory (remove /roms suffix)
+            if roms_path.endswith('/roms'):
+                base_path = roms_path[:-5]  # Remove '/roms'
+                print(f"  Extracted base Emulation path: {base_path}")
+                return base_path
+            return roms_path
+        else:
+            print(f"  romsPath variable not found in {emudeck_settings}")
+    except Exception as e:
+        print(f"Warning: Could not read EmuDeck settings: {e}")
+    
+    return None
 
 
 def main():
@@ -871,7 +910,7 @@ Examples:
     )
     parser.add_argument(
         "--rom-path",
-        help="Base path for ROM files in gamelist.xml (e.g., /run/media/deck/.../Emulation). Required for --target emudeck. If not specified, uses relative paths (./)",
+        help="Base path for Emulation directory (e.g., /run/media/mmcblk0p1/Emulation for SD card). ROMs will be downloaded to {path}/roms/{platform}/. If not specified, uses target default path.",
     )
     parser.add_argument(
         "--all-roms",
@@ -881,7 +920,7 @@ Examples:
     parser.add_argument(
         "--download-roms",
         action="store_true",
-        help="Download ROM files from RomM server to ~/RetroPie/roms/{platform}/",
+        help="Download ROM files from RomM server (uses target default path or --rom-path if specified)",
     )
 
     args = parser.parse_args()
@@ -889,6 +928,13 @@ Examples:
     # Get target configuration
     target_config = TARGET_CONFIGS[args.target]
     print(f"Target system: {target_config['name']}")
+    
+    # Auto-detect ROM path from EmuDeck if not specified
+    if not args.rom_path and args.target in ["steamdeck", "emudeck"]:
+        detected_path = detect_emudeck_roms_path()
+        if detected_path:
+            args.rom_path = detected_path
+            print(f"Auto-detected EmuDeck ROM path: {detected_path}")
     
     # Validate emudeck target requires --rom-path
     if args.target == "emudeck" and not args.rom_path:
