@@ -25,68 +25,91 @@ When using `--target steamdeck`, the script uses ES-DE standard paths:
 
 ## Installation on SteamDeck
 
-### 1. Switch to Desktop Mode
-Press the Steam button → Power → Switch to Desktop
+### Quick Install (Recommended)
 
-### 2. Install Python (if not already installed)
+1. **Switch to Desktop Mode**: Press Steam button → Power → Switch to Desktop
+
+2. **Run the installer**:
 ```bash
-# Check if Python is installed
-python3 --version
-
-# If not installed, use Discover (KDE app store) or:
-sudo pacman -S python python-pip
+curl -sSL https://raw.githubusercontent.com/shinditzu/romm-sync-utility/main/install-steamdeck.sh | bash
 ```
 
-### 3. Install requests library
+This will:
+- Create `~/romm-sync` directory
+- Set up Python virtual environment
+- Install dependencies
+- Download the script
+- Create a wrapper script for easy execution
+
+3. **Run the sync**:
 ```bash
-pip install --user requests
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck
 ```
 
-### 4. Download the script
+### Manual Installation (Alternative)
+
+If you prefer to install manually:
+
 ```bash
-# Create directory
+# Create directory and virtual environment
 mkdir -p ~/romm-sync
 cd ~/romm-sync
+python3 -m venv venv
+source venv/bin/activate
 
-# Download script (replace with your method)
-# Option 1: Use git
-git clone https://github.com/shinditzu/romm-to-retropie.git .
+# Install dependencies
+pip install requests
 
-# Option 2: Download directly
-curl -O https://raw.githubusercontent.com/yourusername/romm-to-retropie/main/romm_sync.py
+# Download script
+curl -O https://raw.githubusercontent.com/shinditzu/romm-sync-utility/main/romm_sync.py
+
+# Create wrapper script
+cat > ~/romm-sync/romm-sync << 'EOF'
+#!/bin/bash
+cd ~/romm-sync
+source venv/bin/activate
+python romm_sync.py "$@"
+deactivate
+EOF
+
+chmod +x ~/romm-sync/romm-sync
 ```
 
-### 5. Create config file (optional)
+### Optional: Add to PATH
+
+To run `romm-sync` from anywhere:
 ```bash
-cat > ~/.romm-config << EOF
-ROMM_SERVER=https://your-romm-server.com
-ROMM_USER=your-username
-ROMM_PASSWORD=your-password
-EOF
-chmod 600 ~/.romm-config
+echo 'export PATH="$HOME/romm-sync:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then you can simply run:
+```bash
+romm-sync -s https://your-server.com -u admin -p password --target steamdeck
 ```
 
 ## Usage
 
+If you used the installer, use the wrapper script (handles venv automatically):
+
 ### Basic Sync (Favorites Only)
 ```bash
-cd ~/romm-sync
-python3 romm_sync.py -s https://your-server.com -u admin -p password --target steamdeck
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck
 ```
 
 ### Sync All ROMs (Warning: Large!)
 ```bash
-python3 romm_sync.py -s https://your-server.com -u admin -p password --target steamdeck --all-roms
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --all-roms
 ```
 
 ### Download ROM Files
 ```bash
-python3 romm_sync.py -s https://your-server.com -u admin -p password --target steamdeck --download-roms
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --download-roms
 ```
 
 ### Dry Run (Preview Changes)
 ```bash
-python3 romm_sync.py -s https://your-server.com -u admin -p password --target steamdeck --dry-run
+~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --dry-run
 ```
 
 ## ES-DE Integration

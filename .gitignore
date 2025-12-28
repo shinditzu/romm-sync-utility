@@ -26,3 +26,4 @@ Thumbs.db
 
 # EmulationStation output (if testing locally)
 .emulationstation/
+.romm-config.old
