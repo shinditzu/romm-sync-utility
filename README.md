@@ -21,14 +21,52 @@ Syncs ROM metadata from a [RomM](https://github.com/rommapp/romm) server to Emul
 - Retry logic with exponential backoff for network requests
 - Dry-run mode for testing
 
+## Installation
+
+### Quick Install (Recommended)
+
+Run the installer script to automatically set up everything:
+
+```bash
+# Clone or download the repository
+git clone https://github.com/yourusername/romm-sync-utility.git
+cd romm-sync-utility
+
+# Run the installer
+./install.sh
+```
+
+The installer will:
+- Check for Python 3.7+ and install dependencies
+- Install the `romm-sync` command to `~/.local/bin`
+- Create example configuration files
+- Set up system-specific wrappers (RetroPie/SteamDeck)
+- Add `~/.local/bin` to your PATH if needed
+
+After installation, you can run:
+```bash
+romm-sync -s https://your-romm-server.com -u admin -p password
+```
+
+### Manual Installation
+
+If you prefer manual installation:
+
+```bash
+# Install Python dependencies
+pip3 install --user requests
+
+# Make the script executable
+chmod +x romm_sync.py
+
+# Run directly
+./romm_sync.py -s https://your-romm-server.com -u admin -p password
+```
+
 ## Requirements
 
 - Python 3.7+
 - `requests` library
-
-```bash
-pip install requests
-```
 
 ## Running from RetroPie
 
