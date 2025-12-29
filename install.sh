@@ -109,25 +109,29 @@ fi
 
 print_success "pip3 is available"
 
-# Install requests library
-print_status "Installing Python dependencies..."
-if pip3 install --user requests --quiet 2>/dev/null; then
-    print_success "Installed 'requests' library"
-else
-    print_warning "Failed to install via pip3, trying alternative method..."
-    
-    # Try using ensurepip if pip install failed
-    if python3 -m pip install --user requests --quiet 2>/dev/null; then
-        print_success "Installed 'requests' library using python3 -m pip"
+# Install requests library (skip for SteamDeck - will be installed in venv)
+if [ "$SYSTEM_TYPE" != "steamdeck" ] && [ "$SYSTEM_TYPE" != "emudeck" ]; then
+    print_status "Installing Python dependencies..."
+    if pip3 install --user requests --quiet 2>/dev/null; then
+        print_success "Installed 'requests' library"
     else
-        print_error "Failed to install 'requests' library"
-        echo ""
-        echo "Please install manually:"
-        echo "  pip3 install --user requests"
-        echo "Or:"
-        echo "  python3 -m pip install --user requests"
-        exit 1
+        print_warning "Failed to install via pip3, trying alternative method..."
+        
+        # Try using ensurepip if pip install failed
+        if python3 -m pip install --user requests --quiet 2>/dev/null; then
+            print_success "Installed 'requests' library using python3 -m pip"
+        else
+            print_error "Failed to install 'requests' library"
+            echo ""
+            echo "Please install manually:"
+            echo "  pip3 install --user requests"
+            echo "Or:"
+            echo "  python3 -m pip install --user requests"
+            exit 1
+        fi
     fi
+else
+    print_status "Skipping global pip install (will use venv for SteamDeck)"
 fi
 
 # Create installation directory
@@ -403,8 +407,18 @@ DESKTOPEOF
         # Try to add to Steam using steamos-add-to-steam if available
         if command -v steamos-add-to-steam &> /dev/null; then
             print_status "Adding to Steam library..."
-            steamos-add-to-steam "$HOME/.local/share/applications/romm-sync.desktop" 2>/dev/null || true
-            print_success "Added to Steam (restart Steam to see it)"
+            if steamos-add-to-steam "$HOME/.local/share/applications/romm-sync.desktop" 2>/dev/null; then
+                print_success "Added to Steam (restart Steam to see it)"
+            else
+                print_warning "Failed to add to Steam automatically"
+                echo ""
+                echo "To add RomM Sync to Steam manually:"
+                echo "  1. Switch to Desktop Mode"
+                echo "  2. Open Steam"
+                echo "  3. Games → Add a Non-Steam Game"
+                echo "  4. Browse and select: $HOME/romm-sync/steam-launcher.sh"
+                echo "  5. Right-click the game → Properties → Set name to 'RomM Sync'"
+            fi
         else
             print_warning "steamos-add-to-steam not found"
             echo ""

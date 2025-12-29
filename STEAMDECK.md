@@ -57,17 +57,21 @@ Use `--rom-path` to manually specify your Emulation directory:
 
 1. **Switch to Desktop Mode**: Press Steam button → Power → Switch to Desktop
 
-2. **Run the installer**:
+2. **Run the universal installer**:
 ```bash
-curl -sSL https://raw.githubusercontent.com/shinditzu/romm-sync-utility/main/install-steamdeck.sh | bash
+git clone https://github.com/shinditzu/romm-sync-utility.git
+cd romm-sync-utility
+./install.sh
 ```
 
-This will:
-- Create `~/romm-sync` directory
-- Set up Python virtual environment
-- Install dependencies
-- Download the script
-- Create a wrapper script for easy execution
+The installer will automatically detect SteamDeck and:
+- Create `~/romm-sync` directory with Python virtual environment
+- Install dependencies (requests library)
+- Copy romm_sync.py and create wrapper scripts
+- Create Steam launcher with GUI menu (zenity)
+- Create desktop shortcut
+- Attempt to add to Steam library automatically
+- Create example configuration file
 
 3. **Run the sync**:
 ```bash

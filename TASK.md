@@ -20,6 +20,10 @@
 - [x] Multi-target support - RetroPie, SteamDeck (ES-DE), and EmuDeck with --target flag (2025-12-23)
 - [x] Automatic removal of unfavorited games - Removes ROMs and images when favorites are removed (2025-12-26)
 - [x] Shell installer script - Universal install.sh for easy setup on all platforms (2025-12-28)
+- [x] SteamDeck venv-based installation with automatic Steam integration (2025-12-28)
+- [x] RetroPie Ports menu auto-creation during installation (2025-12-28)
+- [x] Fixed favorites collection detection - Proper error handling when no collection exists (2025-12-28)
+- [x] SteamDeck read-only filesystem handling - Uses venv to avoid system modifications (2025-12-28)
 
 ## In Progress 🔄
 - None
