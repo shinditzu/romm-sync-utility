@@ -78,36 +78,25 @@ if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" 
     exit 1
 fi
 
-# Check for pip
-print_status "Checking for pip..."
-if ! command -v pip3 &> /dev/null; then
-    print_warning "pip3 not found, attempting to install..."
-    
-    # Don't try to install pip on SteamDeck (read-only filesystem)
-    if [ "$SYSTEM_TYPE" = "steamdeck" ] || [ "$SYSTEM_TYPE" = "emudeck" ]; then
-        print_error "pip3 is not installed on SteamDeck."
-        echo ""
-        echo "SteamOS has a read-only filesystem. To install pip3:"
-        echo "  1. Disable read-only mode: sudo steamos-readonly disable"
-        echo "  2. Initialize pacman keyring: sudo pacman-key --init"
-        echo "  3. Populate keyring: sudo pacman-key --populate archlinux"
-        echo "  4. Install pip: sudo pacman -S python-pip"
-        echo "  5. Re-enable read-only mode: sudo steamos-readonly enable"
-        echo ""
-        echo "Or use the Python ensurepip module:"
-        echo "  python3 -m ensurepip --user"
-        exit 1
-    elif command -v apt-get &> /dev/null; then
-        sudo apt-get update && sudo apt-get install -y python3-pip
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm python-pip
-    else
-        print_error "Could not install pip automatically. Please install python3-pip manually."
-        exit 1
+# Check for pip (skip for SteamDeck - will use venv's pip)
+if [ "$SYSTEM_TYPE" != "steamdeck" ] && [ "$SYSTEM_TYPE" != "emudeck" ]; then
+    print_status "Checking for pip..."
+    if ! command -v pip3 &> /dev/null; then
+        print_warning "pip3 not found, attempting to install..."
+        
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-pip
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -S --noconfirm python-pip
+        else
+            print_error "Could not install pip automatically. Please install python3-pip manually."
+            exit 1
+        fi
     fi
+    print_success "pip3 is available"
+else
+    print_status "Skipping pip check (SteamDeck will use venv)"
 fi
-
-print_success "pip3 is available"
 
 # Install requests library (skip for SteamDeck - will be installed in venv)
 if [ "$SYSTEM_TYPE" != "steamdeck" ] && [ "$SYSTEM_TYPE" != "emudeck" ]; then
