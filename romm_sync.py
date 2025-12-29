@@ -214,6 +214,10 @@ class RomMClient:
             collection_id = self.get_favorites_collection_id()
             if collection_id:
                 params["collection_id"] = collection_id
+            else:
+                # No favorites collection found - this will cause issues
+                # Return empty result to trigger error handling
+                return {"items": [], "total": 0, "_no_favorites_collection": True}
         
         if platform_id is not None:
             params["platform_id"] = platform_id
@@ -620,6 +624,22 @@ def sync_platform(
     # Get ROMs for this platform
     try:
         roms_response = client.get_roms(platform["id"], favorites_only=favorites_only)
+        
+        # Check if no favorites collection was found
+        if isinstance(roms_response, dict) and roms_response.get("_no_favorites_collection"):
+            print(f"\n{'='*60}")
+            print("ERROR: No Favourites collection found!")
+            print(f"{'='*60}")
+            print("\nYou are trying to sync favorites, but this user account has no")
+            print("'Favourites' collection in RomM.")
+            print("\nTo fix this:")
+            print("  1. Log into RomM with this user account")
+            print("  2. Create a collection named 'Favourites' (or 'Favorites')")
+            print("  3. Add some ROMs to the collection")
+            print("\nOr use --all-roms to sync your entire library instead.")
+            print(f"{'='*60}\n")
+            return 0
+        
         if isinstance(roms_response, dict) and "items" in roms_response:
             roms = roms_response["items"]
         elif isinstance(roms_response, list):
