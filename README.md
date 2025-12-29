@@ -63,6 +63,30 @@ chmod +x romm_sync.py
 ./romm_sync.py -s https://your-romm-server.com -u admin -p password
 ```
 
+### SteamDeck Installation Notes
+
+SteamOS has a **read-only filesystem** by default. If you encounter errors like "Read-only file system" when installing pip:
+
+**Option 1: Use ensurepip (Recommended)**
+```bash
+python3 -m ensurepip --user
+python3 -m pip install --user requests
+```
+
+**Option 2: Temporarily disable read-only mode**
+```bash
+sudo steamos-readonly disable
+sudo pacman-key --init
+sudo pacman-key --populate archlinux
+sudo pacman -S python-pip
+sudo steamos-readonly enable
+```
+
+After installing pip, run the installer:
+```bash
+./install.sh
+```
+
 ## Requirements
 
 - Python 3.7+

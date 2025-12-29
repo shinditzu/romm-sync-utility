@@ -83,7 +83,21 @@ print_status "Checking for pip..."
 if ! command -v pip3 &> /dev/null; then
     print_warning "pip3 not found, attempting to install..."
     
-    if command -v apt-get &> /dev/null; then
+    # Don't try to install pip on SteamDeck (read-only filesystem)
+    if [ "$SYSTEM_TYPE" = "steamdeck" ] || [ "$SYSTEM_TYPE" = "emudeck" ]; then
+        print_error "pip3 is not installed on SteamDeck."
+        echo ""
+        echo "SteamOS has a read-only filesystem. To install pip3:"
+        echo "  1. Disable read-only mode: sudo steamos-readonly disable"
+        echo "  2. Initialize pacman keyring: sudo pacman-key --init"
+        echo "  3. Populate keyring: sudo pacman-key --populate archlinux"
+        echo "  4. Install pip: sudo pacman -S python-pip"
+        echo "  5. Re-enable read-only mode: sudo steamos-readonly enable"
+        echo ""
+        echo "Or use the Python ensurepip module:"
+        echo "  python3 -m ensurepip --user"
+        exit 1
+    elif command -v apt-get &> /dev/null; then
         sudo apt-get update && sudo apt-get install -y python3-pip
     elif command -v pacman &> /dev/null; then
         sudo pacman -S --noconfirm python-pip
@@ -97,8 +111,24 @@ print_success "pip3 is available"
 
 # Install requests library
 print_status "Installing Python dependencies..."
-pip3 install --user requests --quiet
-print_success "Installed 'requests' library"
+if pip3 install --user requests --quiet 2>/dev/null; then
+    print_success "Installed 'requests' library"
+else
+    print_warning "Failed to install via pip3, trying alternative method..."
+    
+    # Try using ensurepip if pip install failed
+    if python3 -m pip install --user requests --quiet 2>/dev/null; then
+        print_success "Installed 'requests' library using python3 -m pip"
+    else
+        print_error "Failed to install 'requests' library"
+        echo ""
+        echo "Please install manually:"
+        echo "  pip3 install --user requests"
+        echo "Or:"
+        echo "  python3 -m pip install --user requests"
+        exit 1
+    fi
+fi
 
 # Create installation directory
 print_status "Creating installation directories..."
@@ -256,16 +286,41 @@ XMLEOF
         ;;
         
     steamdeck|emudeck)
-        print_status "Setting up SteamDeck integration..."
+        print_status "Setting up SteamDeck integration (using venv)..."
         
         # Create romm-sync directory
         mkdir -p "$HOME/romm-sync"
+        cd "$HOME/romm-sync"
         
-        # Copy helper scripts if they exist
-        if [ -f "$SCRIPT_DIR/install-steamdeck.sh" ]; then
-            cp "$SCRIPT_DIR/install-steamdeck.sh" "$CONFIG_DIR/"
-            print_success "Copied SteamDeck helper scripts"
-        fi
+        # Create virtual environment (avoids read-only filesystem issues)
+        print_status "Creating Python virtual environment..."
+        python3 -m venv venv
+        print_success "Created virtual environment"
+        
+        # Install dependencies in venv
+        print_status "Installing dependencies in venv..."
+        source venv/bin/activate
+        pip install --upgrade pip --quiet
+        pip install requests --quiet
+        deactivate
+        print_success "Installed dependencies"
+        
+        # Copy romm_sync.py to the directory
+        cp "$SCRIPT_DIR/romm_sync.py" "$HOME/romm-sync/romm_sync.py"
+        print_success "Copied romm_sync.py"
+        
+        # Create wrapper script that uses venv
+        print_status "Creating venv wrapper script..."
+        cat > "$HOME/romm-sync/romm-sync" << 'WRAPPEREOF'
+#!/bin/bash
+# Wrapper script that auto-activates venv
+cd ~/romm-sync
+source venv/bin/activate
+python romm_sync.py "$@"
+deactivate
+WRAPPEREOF
+        chmod +x "$HOME/romm-sync/romm-sync"
+        print_success "Created wrapper script"
         
         # Create Steam launcher script
         print_status "Creating Steam launcher script..."
@@ -273,11 +328,16 @@ XMLEOF
 #!/bin/bash
 # Steam Overlay Launcher for RomM Sync
 
+# Change to script directory and activate venv
+cd ~/romm-sync
+source venv/bin/activate
+
 # Load configuration
 if [ -f "$HOME/.config/romm-sync/config" ]; then
     source "$HOME/.config/romm-sync/config"
 else
     zenity --error --text="Configuration not found!\n\nPlease create ~/.config/romm-sync/config\nSee ~/.config/romm-sync/config.example for template"
+    deactivate
     exit 1
 fi
 
@@ -293,13 +353,13 @@ choice=$(zenity --list --title="RomM Sync" \
 case "$choice" in
     "Sync Favorites (Metadata + Images)")
         zenity --info --text="Starting sync...\nThis may take a few minutes." --timeout=3
-        romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
             zenity --progress --pulsate --auto-close --text="Syncing metadata and images..."
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     "Sync Favorites + Download ROMs")
         zenity --info --text="Starting sync with ROM downloads...\nThis may take a while." --timeout=3
-        romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
             zenity --progress --pulsate --auto-close --text="Syncing and downloading ROMs..."
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
@@ -307,15 +367,18 @@ case "$choice" in
         zenity --question --text="This will sync ALL ROMs, not just favorites.\n\nThis could take a very long time and use a lot of storage.\n\nContinue?"
         if [ $? -eq 0 ]; then
             zenity --info --text="Starting full sync...\nThis will take a long time." --timeout=3
-            romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --all-roms --download-roms 2>&1 | \
+            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --all-roms --download-roms 2>&1 | \
                 zenity --progress --pulsate --auto-close --text="Syncing all ROMs..."
             zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         fi
         ;;
     *)
+        deactivate
         exit 0
         ;;
 esac
+
+deactivate
 STEAMEOF
         chmod +x "$HOME/romm-sync/steam-launcher.sh"
         print_success "Created Steam launcher script"
