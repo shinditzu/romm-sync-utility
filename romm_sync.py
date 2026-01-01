@@ -20,14 +20,17 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
 import re
+from typing import Optional
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 # Force unbuffered output for real-time progress display (especially when piped to zenity)
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
 
 
 # Target system configurations
@@ -160,7 +163,7 @@ class RomMClient:
         """Get all collections from RomM."""
         return self._get("/collections")
     
-    def get_favorites_collection_id(self) -> int | None:
+    def get_favorites_collection_id(self) -> Optional[int]:
         """Get the ID of the Favourites collection."""
         collections = self.get_collections()
         for collection in collections:
@@ -168,7 +171,7 @@ class RomMClient:
                 return collection.get('id')
         return None
     
-    def get_kid_friendly_collection_id(self) -> int | None:
+    def get_kid_friendly_collection_id(self) -> Optional[int]:
         """Get the ID of the Kid Friendly collection."""
         collections = self.get_collections()
         for collection in collections:
@@ -241,7 +244,7 @@ class RomMClient:
         """Get detailed info for a specific ROM."""
         return self._get(f"/roms/{rom_id}")
 
-    def get_cover_url(self, rom: dict) -> str | None:
+    def get_cover_url(self, rom: dict) -> Optional[str]:
         """Get the cover image URL for a ROM."""
         # Prefer external URL if available (IGDB, etc.)
         if rom.get("url_cover"):
@@ -251,7 +254,7 @@ class RomMClient:
             return f"{self.server_url}/api/roms/{rom['id']}/cover/small"
         return None
 
-    def get_screenshot_url(self, rom: dict) -> str | None:
+    def get_screenshot_url(self, rom: dict) -> Optional[str]:
         """Get the screenshot URL for a ROM."""
         # Similar to cover, prefer external URL
         if rom.get("url_screenshot"):
@@ -344,7 +347,7 @@ def format_bytes(bytes_count: int) -> str:
     return f"{bytes_count:.1f} TB"
 
 
-def format_date(date_str: str | None) -> str:
+def format_date(date_str: Optional[str]) -> str:
     """Convert date to EmulationStation format (YYYYMMDDTHHMMSS)."""
     if not date_str:
         return ""
@@ -669,7 +672,9 @@ def sync_platform(
     platform_path = gamelist_base_path / retropie_folder
 
     print(f"\n{'='*60}")
-    print(f"Platform: {platform_name} ({platform_slug} -> {retropie_folder})")
+    print(f"Platform: {platform_slug} ({platform['name']})")
+    print(f"  Platform ID: {platform['id']}")
+    print(f"  EmulationStation folder: {retropie_folder}")
     print(f"{'='*60}")
 
     # Get ROMs for this platform
@@ -891,10 +896,13 @@ def detect_emudeck_roms_path() -> str:
     
     try:
         content = emudeck_settings.read_text()
-        # Look for romsPath variable (e.g., romsPath=/run/media/mmcblk0p1/Emulation/roms)
-        match = re.search(r'romsPath=["\']?([^"\';\n]+)', content)
+        # Look for romsPath variable (e.g., romsPath="/path"/Emulation/roms or romsPath=/path/Emulation/roms)
+        # Handle malformed paths like: romsPath="/uuid"/Emulation/roms
+        match = re.search(r'romsPath=(.+?)(?:\n|$)', content)
         if match:
-            roms_path = match.group(1).strip()
+            roms_path_raw = match.group(1).strip()
+            # Remove quotes and reconstruct the full path
+            roms_path = roms_path_raw.replace('"', '').replace("'", '')
             print(f"  Found romsPath in EmuDeck settings: {roms_path}")
             # Extract base Emulation directory (remove /roms suffix)
             if roms_path.endswith('/roms'):
