@@ -218,6 +218,7 @@ class RomMClient:
             collection_id = self.get_favorites_collection_id()
             if collection_id:
                 params["collection_id"] = collection_id
+                print(f"  DEBUG: Using Favorites collection_id={collection_id}")
             else:
                 # No favorites collection found - this will cause issues
                 # Return empty result to trigger error handling
@@ -225,8 +226,16 @@ class RomMClient:
         
         if platform_id is not None:
             params["platform_id"] = platform_id
-            
-        return self._get("/roms", params=params, timeout=180)
+        
+        print(f"  DEBUG: API query params: {params}")
+        result = self._get("/roms", params=params, timeout=180)
+        
+        if isinstance(result, dict) and "items" in result:
+            print(f"  DEBUG: API returned {len(result['items'])} ROMs (total: {result.get('total', 'unknown')})")
+        elif isinstance(result, list):
+            print(f"  DEBUG: API returned {len(result)} ROMs")
+        
+        return result
 
     def get_rom(self, rom_id: int) -> dict:
         """Get detailed info for a specific ROM."""
@@ -660,7 +669,9 @@ def sync_platform(
     platform_path = gamelist_base_path / retropie_folder
 
     print(f"\n{'='*60}")
-    print(f"Platform: {platform_name} ({platform_slug} -> {retropie_folder})")
+    print(f"Platform: {platform_slug} ({platform['name']})")
+    print(f"  Platform ID: {platform['id']}")
+    print(f"  EmulationStation folder: {retropie_folder}")
     print(f"{'='*60}")
 
     # Get ROMs for this platform
