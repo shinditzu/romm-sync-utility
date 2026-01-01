@@ -417,7 +417,7 @@ def create_gamelist_xml(roms: list, platform_slug: str, retropie_folder: str, ro
             image_filename = f"{rom_id}-image.png"
             
             # Build image path based on target config
-            images_base = target_config["images_path"]
+            images_base = os.path.expanduser(target_config["images_path"])
             image_subdir = target_config["image_subdir"]
             
             if image_subdir:
