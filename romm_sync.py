@@ -25,6 +25,10 @@ from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# Force unbuffered output for real-time progress display (especially when piped to zenity)
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 
 # Target system configurations
 TARGET_CONFIGS = {

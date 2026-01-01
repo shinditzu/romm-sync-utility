@@ -25,22 +25,34 @@ choice=$(zenity --list --title="RomM Sync" \
 case "$choice" in
     "Sync Favorites (Metadata + Images)")
         zenity --info --text="Starting sync...\nThis may take a few minutes." --timeout=3
-        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
-            zenity --progress --pulsate --auto-close --text="Syncing metadata and images..."
+        (
+            stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
+            while IFS= read -r line; do
+                echo "# $line"
+            done
+        ) | zenity --progress --pulsate --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     "Sync Favorites + Download ROMs")
         zenity --info --text="Starting sync with ROM downloads...\nThis may take a while." --timeout=3
-        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
-            zenity --progress --pulsate --auto-close --text="Syncing and downloading ROMs..."
+        (
+            stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
+            while IFS= read -r line; do
+                echo "# $line"
+            done
+        ) | zenity --progress --pulsate --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     "Sync All ROMs (Large!)")
         zenity --question --text="This will sync ALL ROMs, not just favorites.\n\nThis could take a very long time and use a lot of storage.\n\nContinue?"
         if [ $? -eq 0 ]; then
             zenity --info --text="Starting full sync...\nThis will take a long time." --timeout=3
-            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --all-roms --download-roms 2>&1 | \
-                zenity --progress --pulsate --auto-close --text="Syncing all ROMs..."
+            (
+                stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --all-roms --download-roms 2>&1 | \
+                while IFS= read -r line; do
+                    echo "# $line"
+                done
+            ) | zenity --progress --pulsate --auto-close --no-cancel
             zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         fi
         ;;
