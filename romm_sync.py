@@ -882,40 +882,52 @@ def sync_platform(
     return len(roms)
 
 
-def detect_emudeck_roms_path() -> str:
-    """Detect ROM path from EmuDeck settings if available.
+def detect_emudeck_paths() -> dict:
+    """Detect ROM and media paths from EmuDeck settings if available.
     
     Returns:
-        Base Emulation path from EmuDeck settings, or None if not found.
+        Dict with 'roms_path' and 'media_path' keys, or empty dict if not found.
     """
-    emudeck_settings = Path.home() / "emudeck" / "settings.sh"
+    emudeck_settings = Path.home() / ".config" / "EmuDeck" / "settings.sh"
     
     if not emudeck_settings.exists():
-        print(f"  EmuDeck settings not found at: {emudeck_settings}")
-        return None
+        # Try old location
+        emudeck_settings = Path.home() / "emudeck" / "settings.sh"
+        if not emudeck_settings.exists():
+            print(f"  EmuDeck settings not found")
+            return {}
+    
+    result = {}
     
     try:
         content = emudeck_settings.read_text()
-        # Look for romsPath variable (e.g., romsPath="/path"/Emulation/roms or romsPath=/path/Emulation/roms)
-        # Handle malformed paths like: romsPath="/uuid"/Emulation/roms
+        
+        # Look for romsPath variable
         match = re.search(r'romsPath=(.+?)(?:\n|$)', content)
         if match:
             roms_path_raw = match.group(1).strip()
-            # Remove quotes and reconstruct the full path
             roms_path = roms_path_raw.replace('"', '').replace("'", '')
             print(f"  Found romsPath in EmuDeck settings: {roms_path}")
             # Extract base Emulation directory (remove /roms suffix)
             if roms_path.endswith('/roms'):
                 base_path = roms_path[:-5]  # Remove '/roms'
                 print(f"  Extracted base Emulation path: {base_path}")
-                return base_path
-            return roms_path
-        else:
-            print(f"  romsPath variable not found in {emudeck_settings}")
+                result['roms_path'] = base_path
+            else:
+                result['roms_path'] = roms_path
+        
+        # Look for ESDEscrapData variable (media path)
+        match = re.search(r'ESDEscrapData=(.+?)(?:\n|$)', content)
+        if match:
+            media_path_raw = match.group(1).strip()
+            media_path = media_path_raw.replace('"', '').replace("'", '')
+            print(f"  Found ESDEscrapData in EmuDeck settings: {media_path}")
+            result['media_path'] = media_path
+        
     except Exception as e:
         print(f"Warning: Could not read EmuDeck settings: {e}")
     
-    return None
+    return result
 
 
 def main():
@@ -1009,19 +1021,34 @@ Examples:
         action="store_true",
         help="Download ROM files from RomM server (uses target default path or --rom-path if specified)",
     )
+    parser.add_argument(
+        "--no-auto-detect",
+        action="store_true",
+        help="Disable auto-detection of EmuDeck paths and use standard ES-DE default paths",
+    )
 
     args = parser.parse_args()
 
-    # Get target configuration
-    target_config = TARGET_CONFIGS[args.target]
+    # Get target configuration (make a copy so we can modify it)
+    target_config = TARGET_CONFIGS[args.target].copy()
     print(f"Target system: {target_config['name']}")
     
-    # Auto-detect ROM path from EmuDeck if not specified
-    if not args.rom_path and args.target in ["steamdeck", "emudeck"]:
-        detected_path = detect_emudeck_roms_path()
-        if detected_path:
-            args.rom_path = detected_path
-            print(f"Auto-detected EmuDeck ROM path: {detected_path}")
+    # Auto-detect paths from EmuDeck if not disabled
+    if not args.no_auto_detect and args.target in ["steamdeck", "emudeck"]:
+        detected_paths = detect_emudeck_paths()
+        
+        # Use detected ROM path if not specified
+        if not args.rom_path and detected_paths.get('roms_path'):
+            args.rom_path = detected_paths['roms_path']
+            print(f"Auto-detected EmuDeck ROM path: {args.rom_path}")
+        
+        # Use detected media path for images
+        if detected_paths.get('media_path'):
+            target_config['images_path'] = detected_paths['media_path']
+            print(f"Auto-detected EmuDeck media path: {detected_paths['media_path']}")
+    
+    if args.no_auto_detect:
+        print("Auto-detection disabled - using standard ES-DE default paths")
     
     # Validate emudeck target requires --rom-path
     if args.target == "emudeck" and not args.rom_path:
