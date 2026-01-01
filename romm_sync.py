@@ -669,9 +669,7 @@ def sync_platform(
     platform_path = gamelist_base_path / retropie_folder
 
     print(f"\n{'='*60}")
-    print(f"Platform: {platform_slug} ({platform['name']})")
-    print(f"  Platform ID: {platform['id']}")
-    print(f"  EmulationStation folder: {retropie_folder}")
+    print(f"Platform: {platform_name} ({platform_slug} -> {retropie_folder})")
     print(f"{'='*60}")
 
     # Get ROMs for this platform
