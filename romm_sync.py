@@ -256,12 +256,13 @@ class RomMClient:
         """Get the download URL for a ROM file."""
         return f"{self.server_url}/api/roms/{rom_id}/content/download"
     
-    def download_rom_file(self, rom: dict, output_path: Path) -> bool:
+    def download_rom_file(self, rom: dict, output_path: Path, show_progress: bool = True) -> bool:
         """Download a ROM file from RomM.
         
         Args:
             rom: ROM dictionary with id and fs_name.
             output_path: Path where the ROM file should be saved.
+            show_progress: Whether to show download progress.
         
         Returns:
             True if download succeeded, False otherwise.
@@ -278,19 +279,56 @@ class RomMClient:
             response = self.session.get(download_url, stream=True, timeout=300)
             response.raise_for_status()
             
-            # Write file in chunks
+            # Get file size if available
+            total_size = int(response.headers.get('content-length', 0))
+            
+            # Write file in chunks with progress
+            downloaded = 0
+            start_time = time.time()
+            chunk_size = 8192
+            
             with open(output_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=chunk_size):
                     if chunk:
                         f.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        # Show progress every 1MB or at completion
+                        if show_progress and total_size > 0 and (downloaded % (1024 * 1024) == 0 or downloaded == total_size):
+                            elapsed = time.time() - start_time
+                            if elapsed > 0:
+                                speed = downloaded / elapsed
+                                percent = (downloaded / total_size) * 100
+                                print(f"\r      Progress: {percent:.1f}% ({format_bytes(downloaded)}/{format_bytes(total_size)}) @ {format_bytes(speed)}/s", end='', flush=True)
+            
+            if show_progress and total_size > 0:
+                print()  # New line after progress
             
             return True
         except Exception as e:
+            if show_progress:
+                print()  # New line before error
             print(f"    Error downloading {fs_name}: {e}")
             # Clean up partial download
             if output_path.exists():
                 output_path.unlink()
             return False
+
+
+def format_bytes(bytes_count: int) -> str:
+    """Format bytes into human-readable size.
+    
+    Args:
+        bytes_count: Number of bytes.
+    
+    Returns:
+        Formatted string (e.g., "1.5 MB").
+    """
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_count < 1024.0:
+            return f"{bytes_count:.1f} {unit}"
+        bytes_count /= 1024.0
+    return f"{bytes_count:.1f} TB"
 
 
 def format_date(date_str: str | None) -> str:
@@ -743,6 +781,8 @@ def sync_platform(
         failed = 0
         auth_errors = 0
         not_found = 0
+        total_with_covers = sum(1 for rom in roms if rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l"))
+        
         for i, rom in enumerate(roms):
             has_cover = rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l")
             if has_cover:
@@ -750,10 +790,12 @@ def sync_platform(
                 image_filename = f"{rom_id}-image.png"
                 image_path = images_path / image_filename
                 if not image_path.exists():
+                    # Show progress counter
+                    current = downloaded + failed + 1
+                    print(f"\r    Downloading image {current}/{total_with_covers}: {rom.get('name', 'Unknown')[:50]}...", end='', flush=True)
+                    
                     if download_image(client, rom, image_path):
                         downloaded += 1
-                        if downloaded <= 3:
-                            print(f"    {rom.get('name', 'Unknown')}")
                     else:
                         failed += 1
                     
@@ -762,6 +804,9 @@ def sync_platform(
                         time.sleep(0.5)
                 else:
                     skipped += 1
+        
+        if downloaded > 0 or failed > 0:
+            print()  # New line after progress
         print(f"  Downloaded {downloaded} cover images (skipped {skipped} existing, {failed} failed)")
         if failed > 0:
             print(f"  Note: {failed} images failed to download (check auth or network issues)")
@@ -776,8 +821,9 @@ def sync_platform(
         downloaded = 0
         skipped = 0
         failed = 0
+        total_roms = len(roms)
         
-        for rom in roms:
+        for idx, rom in enumerate(roms, 1):
             fs_name = rom.get('fs_name')
             if not fs_name:
                 failed += 1
@@ -791,7 +837,7 @@ def sync_platform(
                 continue
             
             # Download ROM file
-            print(f"    Downloading {fs_name}...")
+            print(f"    [{idx}/{total_roms}] Downloading {fs_name}...")
             if client.download_rom_file(rom, dest_path):
                 downloaded += 1
             else:

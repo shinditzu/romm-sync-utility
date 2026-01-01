@@ -24,6 +24,7 @@
 - [x] RetroPie Ports menu auto-creation during installation (2025-12-28)
 - [x] Fixed favorites collection detection - Proper error handling when no collection exists (2025-12-28)
 - [x] SteamDeck read-only filesystem handling - Uses venv to avoid system modifications (2025-12-28)
+- [x] Download progress display - Shows real-time progress for ROM and image downloads (2025-12-31)
 
 ## In Progress 🔄
 - None
