@@ -897,13 +897,7 @@ def detect_esde_paths() -> dict:
         if match:
             roms_path = match.group(1)
             print(f"  Found ROMDirectory in ES-DE settings: {roms_path}")
-            # Extract base Emulation directory (remove /roms suffix)
-            if roms_path.endswith('/roms'):
-                base_path = roms_path[:-5]  # Remove '/roms'
-                print(f"  Extracted base Emulation path: {base_path}")
-                result['roms_path'] = base_path
-            else:
-                result['roms_path'] = roms_path
+            result['roms_path'] = roms_path
         
         # Look for MediaDirectory
         match = re.search(r'<string name="MediaDirectory" value="([^"]+)"', content)
