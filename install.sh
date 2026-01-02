@@ -361,7 +361,7 @@ WRAPPEREOF
     <fullname>Tools</fullname>
     <path>~/romm-sync</path>
     <extension>.sh</extension>
-    <command>%ROM%</command>
+    <command>/bin/bash %ROM%</command>
   </system>
 </systemList>
 ESDEEOF
