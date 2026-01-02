@@ -406,8 +406,9 @@ def create_gamelist_xml(roms: list, platform_slug: str, retropie_folder: str, ro
         # Cover image
         if rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l"):
             image_elem = ET.SubElement(game, "image")
-            rom_id = rom.get("id", "unknown")
-            image_filename = f"{rom_id}-image.png"
+            # Use ROM filename (without extension) for image name to match ES-DE expectations
+            rom_filename_base = Path(filename).stem  # Remove extension
+            image_filename = f"{rom_filename_base}.png"
             
             # Build image path based on target config
             images_base = os.path.expanduser(target_config["images_path"])
@@ -797,8 +798,10 @@ def sync_platform(
         for i, rom in enumerate(roms):
             has_cover = rom.get("url_cover") or rom.get("path_cover_s") or rom.get("path_cover_l")
             if has_cover:
-                rom_id = rom.get("id", "unknown")
-                image_filename = f"{rom_id}-image.png"
+                # Use ROM filename (without extension) for image name to match ES-DE expectations
+                rom_filename = rom.get("fs_name", "") or rom.get("file_name", "") or rom.get("name", "unknown")
+                rom_filename_base = Path(rom_filename).stem  # Remove extension
+                image_filename = f"{rom_filename_base}.png"
                 image_path = images_path / image_filename
                 if not image_path.exists():
                     # Show progress counter
