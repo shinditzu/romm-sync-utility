@@ -25,24 +25,30 @@ choice=$(zenity --list --title="RomM Sync" \
 
 case "$choice" in
     "Sync Favorites (Metadata + Images)")
-        zenity --info --text="Starting sync...\nThis may take a few minutes." --timeout=3
-        (
-            stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
-            while IFS= read -r line; do
-                echo "# $line"
-            done
-        ) | zenity --progress --pulsate --auto-close --no-cancel
-        zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
+        # Run sync and capture output
+        output=$(mktemp)
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | tee "$output" | \
+            zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites..." --auto-close --no-cancel &
+        
+        # Wait for sync to complete
+        wait
+        
+        # Show detailed results
+        zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
+        rm -f "$output"
         ;;
     "Sync Favorites + Download ROMs")
-        zenity --info --text="Starting sync with ROM downloads...\nThis may take a while." --timeout=3
-        (
-            stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
-            while IFS= read -r line; do
-                echo "# $line"
-            done
-        ) | zenity --progress --pulsate --auto-close --no-cancel
-        zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
+        # Run sync and capture output
+        output=$(mktemp)
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | tee "$output" | \
+            zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites and downloading ROMs..." --auto-close --no-cancel &
+        
+        # Wait for sync to complete
+        wait
+        
+        # Show detailed results
+        zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
+        rm -f "$output"
         ;;
     *)
         deactivate
