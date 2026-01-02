@@ -2,18 +2,20 @@
 # Steam Overlay Launcher for RomM Sync
 # This script provides a simple menu interface for syncing ROMs from Steam's overlay
 
-# Change to script directory
+# Change to script directory and activate venv
 cd ~/romm-sync
-
-# Activate virtual environment
 source venv/bin/activate
 
-# Configuration (edit these values)
-ROMM_SERVER="https://your-romm-server.com"
-ROMM_USER="your-username"
-ROMM_PASSWORD="your-password"
+# Load configuration
+if [ -f "$HOME/.config/romm-sync/config" ]; then
+    source "$HOME/.config/romm-sync/config"
+else
+    zenity --error --text="Configuration not found!\n\nPlease create ~/.config/romm-sync/config\nSee ~/.config/romm-sync/config.example for template"
+    deactivate
+    exit 1
+fi
 
-# Show menu using zenity (KDE's dialog tool)
+# Show menu using zenity
 choice=$(zenity --list --title="RomM Sync" \
     --text="Select sync option:" \
     --column="Option" \
@@ -29,7 +31,7 @@ case "$choice" in
             while IFS= read -r line; do
                 echo "# $line"
             done
-        ) | zenity --progress --auto-close --no-cancel
+        ) | zenity --progress --pulsate --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     "Sync Favorites + Download ROMs")
@@ -39,10 +41,11 @@ case "$choice" in
             while IFS= read -r line; do
                 echo "# $line"
             done
-        ) | zenity --progress --auto-close --no-cancel
+        ) | zenity --progress --pulsate --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     *)
+        deactivate
         exit 0
         ;;
 esac
