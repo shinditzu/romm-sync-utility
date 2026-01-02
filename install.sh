@@ -232,6 +232,10 @@ case "$SYSTEM_TYPE" in
         # Create romm-sync directory
         mkdir -p "$HOME/romm-sync"
         
+        # Copy romm_sync.py to ~/romm-sync/
+        cp "$SCRIPT_DIR/romm_sync.py" "$HOME/romm-sync/"
+        print_success "Copied romm_sync.py to ~/romm-sync/"
+        
         # Copy sync-romm.sh if it exists
         if [ -f "$SCRIPT_DIR/sync-romm.sh" ]; then
             cp "$SCRIPT_DIR/sync-romm.sh" "$HOME/romm-sync/"

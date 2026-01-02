@@ -38,6 +38,7 @@
 - [x] Improved SteamDeck sync display - Shows detailed scrollable output instead of pulsing bar (2026-01-02)
 - [x] Updated RetroPie documentation - Now recommends using installer like SteamDeck (2026-01-02)
 - [x] Improved installer pip handling - Multiple fallback methods including apt-get (2026-01-02)
+- [x] Fixed RetroPie installer - Now copies romm_sync.py to ~/romm-sync/ directory (2026-01-02)
 
 ## In Progress 🔄
 - None
