@@ -796,7 +796,12 @@ def sync_platform(
     
     # Override roms_base if rom_base_path is provided
     if rom_base_path:
-        roms_base = Path(rom_base_path.replace("~", str(home_dir))) / "roms"
+        rom_base_expanded = Path(rom_base_path.replace("~", str(home_dir)))
+        # Check if path already ends with /roms (from ES-DE auto-detection)
+        if rom_base_expanded.name == "roms":
+            roms_base = rom_base_expanded
+        else:
+            roms_base = rom_base_expanded / "roms"
     else:
         roms_base = Path(target_config["roms_path"].replace("~", str(home_dir)))
     

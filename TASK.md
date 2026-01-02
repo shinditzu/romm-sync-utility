@@ -34,6 +34,7 @@
 - [x] Removed all-roms option from SteamDeck menu - Only favorites sync available in UI (2026-01-02)
 - [x] Refactored installer to copy steam-launcher.sh instead of generating inline (2026-01-02)
 - [x] Detailed file operation logging - Logs all directory creation, file downloads, and deletions (2026-01-02)
+- [x] Fixed double /roms/ path issue - Correctly handles ES-DE auto-detected paths (2026-01-02)
 
 ## In Progress 🔄
 - None
