@@ -5,15 +5,14 @@
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Load configuration from .romm-config file
-CONFIG_FILE="$SCRIPT_DIR/.romm-config"
+# Load configuration from standardized config location
+CONFIG_FILE="$HOME/.config/romm-sync/config"
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
-    # Fallback to default values if config file doesn't exist
-    ROMM_SERVER="${ROMM_SERVER}"
-    ROMM_USER="${ROMM_USER}"
-    ROMM_PASSWORD="${ROMM_PASSWORD}"
+    dialog --title "Configuration Error" --msgbox "Configuration not found!\n\nPlease create: ~/.config/romm-sync/config\n\nSee ~/.config/romm-sync/config.example for template" 10 60
+    clear
+    exit 1
 fi
 
 # Check if dialog is available
@@ -136,7 +135,7 @@ select_platforms() {
 
 # Function to show configuration
 show_config() {
-    dialog --title "Current Configuration" --msgbox "Server: $ROMM_SERVER\nUser: $ROMM_USER\n\nTo change settings, edit:\n$SCRIPT_DIR/sync-romm.sh" 12 60
+    dialog --title "Current Configuration" --msgbox "Server: $ROMM_SERVER\nUser: $ROMM_USER\n\nTo change settings, edit:\n~/.config/romm-sync/config" 12 60
 }
 
 # Function to view sync status

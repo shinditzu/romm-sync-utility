@@ -294,9 +294,9 @@ sudo reboot
 
 ## Security Best Practices
 
-Your RomM credentials are stored in `~/.romm-config`:
+Your RomM credentials are stored in `~/.config/romm-sync/config`:
 
-1. **File permissions** are set to `600` (only you can read/write)
+1. **File permissions** should be set to `600` (only you can read/write): `chmod 600 ~/.config/romm-sync/config`
 2. **Keep the file secure** - don't share it or commit it to version control
 3. **Alternative: Environment variables** - You can also set these in your shell profile:
 ```bash
