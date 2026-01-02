@@ -44,8 +44,8 @@ print_warning() {
 detect_system() {
     if [ -d "$HOME/RetroPie" ]; then
         echo "retropie"
-    elif [ -d "$HOME/Emulation" ] && [ -f "/etc/os-release" ] && grep -q "SteamOS" /etc/os-release; then
-        echo "steamdeck"
+    # elif [ -d "$HOME/Emulation" ] && [ -f "/etc/os-release" ] && grep -q "SteamOS" /etc/os-release; then
+    #     echo "steamdeck"
     elif [ -d "/run/media/deck" ] && [ -d "$HOME/.config/EmuDeck" ]; then
         echo "emudeck"
     else
