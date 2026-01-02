@@ -97,18 +97,31 @@ After installing pip, run the installer:
 
 See **[RETROPIE_INTEGRATION.md](RETROPIE_INTEGRATION.md)** for detailed instructions on:
 - Running the sync from EmulationStation's Ports menu
-- Adding to RetroPie-Setup menu
 - Setting up automatic syncs with cron
-- SSH command-line usage
+- Manual installation steps
 
 **Quick Start for RetroPie:**
 ```bash
-# Copy files to RetroPie
-scp romm_sync.py sync-romm.sh pi@retropie:~/romm-sync/
+# Clone or copy the repository to RetroPie
+git clone https://github.com/yourusername/romm-sync-utility.git
+cd romm-sync-utility
 
-# SSH into RetroPie and run
-chmod +x ~/romm-sync/sync-romm.sh
-~/romm-sync/sync-romm.sh
+# Run the installer
+./install.sh
+
+# The installer will:
+# - Install dependencies (requests library)
+# - Install the romm-sync command to ~/.local/bin
+# - Create a menu entry in EmulationStation → RetroPie → RomM Sync
+# - Create example configuration file
+
+# Configure your RomM server
+nano ~/.config/romm-sync/config.example
+# Edit with your server details, then:
+mv ~/.config/romm-sync/config.example ~/.config/romm-sync/config
+
+# Access from EmulationStation → RetroPie → RomM Sync
+# Or run from SSH: romm-sync -s https://your-server.com -u admin -p password
 ```
 
 ## Usage

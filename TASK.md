@@ -36,6 +36,7 @@
 - [x] Detailed file operation logging - Logs all directory creation, file downloads, and deletions (2026-01-02)
 - [x] Fixed double /roms/ path issue - Correctly handles ES-DE auto-detected paths (2026-01-02)
 - [x] Improved SteamDeck sync display - Shows detailed scrollable output instead of pulsing bar (2026-01-02)
+- [x] Updated RetroPie documentation - Now recommends using installer like SteamDeck (2026-01-02)
 
 ## In Progress 🔄
 - None

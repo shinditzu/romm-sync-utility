@@ -6,23 +6,67 @@ This guide explains how to run the RomM sync script directly from your RetroPie 
 
 1. SSH access to your RetroPie
 2. Python 3 installed (usually pre-installed on RetroPie)
-3. `requests` Python library installed
+3. Internet connection for downloading dependencies
 
 ## Installation
 
-### 1. Install Python Dependencies
+### Recommended: Use the Installer (Easiest)
 
-SSH into your RetroPie and run:
+The installer automatically sets up everything for you:
+
+```bash
+# SSH into your RetroPie
+ssh pi@retropie
+
+# Clone or copy the repository
+git clone https://github.com/yourusername/romm-sync-utility.git
+cd romm-sync-utility
+
+# Run the installer
+./install.sh
+
+# The installer will:
+# - Detect that you're on RetroPie
+# - Install Python dependencies (requests library)
+# - Install the romm-sync command to ~/.local/bin
+# - Copy sync-romm.sh to ~/romm-sync/
+# - Create a menu entry in EmulationStation → RetroPie → RomM Sync
+# - Create example configuration file at ~/.config/romm-sync/config.example
+```
+
+### Configure Your RomM Server
+
+After installation, configure your server details:
+
+```bash
+# Edit the example config
+nano ~/.config/romm-sync/config.example
+
+# Add your server details:
+ROMM_SERVER=https://your-romm-server.com
+ROMM_USER=your-username
+ROMM_PASSWORD=your-password
+
+# Save and rename to activate
+mv ~/.config/romm-sync/config.example ~/.config/romm-sync/config
+```
+
+### Alternative: Manual Installation
+
+If you prefer to install manually or the installer doesn't work:
+
+<details>
+<summary>Click to expand manual installation steps</summary>
+
+#### 1. Install Python Dependencies
 
 ```bash
 sudo apt-get update
 sudo apt-get install python3-pip
-pip3 install requests
+pip3 install --user requests
 ```
 
-### 2. Copy Files to RetroPie
-
-Copy the sync script files to your RetroPie. You can use SCP or copy them via the network share:
+#### 2. Copy Files to RetroPie
 
 ```bash
 # Create directory for the script
@@ -35,27 +79,26 @@ scp romm_sync.py sync-romm.sh pi@retropie:~/romm-sync/
 # \\RETROPIE\home\pi\romm-sync\
 ```
 
-### 3. Configure Your RomM Credentials
-
-Create a `.romm-config` file with your RomM server credentials:
+#### 3. Configure Your RomM Credentials
 
 ```bash
-cat > ~/romm-sync/.romm-config << 'EOF'
-ROMM_SERVER="https://your-romm-server.com"
-ROMM_USER="your-username"
-ROMM_PASSWORD="your-password"
+mkdir -p ~/.config/romm-sync
+cat > ~/.config/romm-sync/config << 'EOF'
+ROMM_SERVER=https://your-romm-server.com
+ROMM_USER=your-username
+ROMM_PASSWORD=your-password
 EOF
 
-chmod 600 ~/romm-sync/.romm-config
+chmod 600 ~/.config/romm-sync/config
 ```
 
-**Security Note:** The `.romm-config` file contains your password. The `chmod 600` command ensures only you can read it.
-
-### 4. Make Script Executable
+#### 4. Make Script Executable
 
 ```bash
 chmod +x ~/romm-sync/sync-romm.sh
 ```
+
+</details>
 
 ## Running the Sync
 
