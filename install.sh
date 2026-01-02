@@ -341,6 +341,49 @@ WRAPPEREOF
             exit 1
         fi
         
+        # Copy ES-DE launcher script for tools menu
+        print_status "Installing ES-DE tools launcher..."
+        if [ -f "$SCRIPT_DIR/esde-launcher.sh" ]; then
+            cp "$SCRIPT_DIR/esde-launcher.sh" "$HOME/romm-sync/"
+            chmod +x "$HOME/romm-sync/esde-launcher.sh"
+            print_success "Copied esde-launcher.sh"
+            
+            # Create ES-DE custom_systems directory for tools
+            ESDE_CUSTOM_DIR="$HOME/ES-DE/custom_systems"
+            mkdir -p "$ESDE_CUSTOM_DIR"
+            
+            # Create tools system configuration
+            cat > "$ESDE_CUSTOM_DIR/es_systems.xml" << 'ESDEEOF'
+<?xml version="1.0"?>
+<systemList>
+  <system>
+    <name>tools</name>
+    <fullname>Tools</fullname>
+    <path>~/romm-sync</path>
+    <extension>.sh</extension>
+    <command>%ROM%</command>
+  </system>
+</systemList>
+ESDEEOF
+            
+            # Create gamelist for the tools system
+            TOOLS_GAMELIST_DIR="$HOME/ES-DE/gamelists/tools"
+            mkdir -p "$TOOLS_GAMELIST_DIR"
+            
+            cat > "$TOOLS_GAMELIST_DIR/gamelist.xml" << 'GAMELISTEOF'
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./esde-launcher.sh</path>
+    <name>RomM Sync</name>
+    <desc>Sync ROM metadata and files from RomM server</desc>
+  </game>
+</gameList>
+GAMELISTEOF
+            
+            print_success "Created ES-DE tools menu entry"
+        fi
+        
         # Create desktop entry for non-Steam game
         print_status "Creating desktop shortcut..."
         mkdir -p "$HOME/.local/share/applications"
@@ -389,11 +432,14 @@ DESKTOPEOF
         echo "Next steps:"
         echo "  1. Edit ~/.config/romm-sync/config.example with your RomM server details"
         echo "  2. Rename it to 'config' (mv ~/.config/romm-sync/config.example ~/.config/romm-sync/config)"
-        echo "  3. Launch 'RomM Sync' from Steam or Desktop Mode"
-        echo "  4. Or run from terminal: romm-sync --target steamdeck -s https://your-server.com -u admin -p password"
+        echo "  3. Restart ES-DE to see the Tools menu"
         echo ""
-        echo "The RomM Sync shortcut is available:"
+        echo "RomM Sync is now available in three ways:"
+        echo "  • ES-DE: Tools → RomM Sync (recommended)"
+        echo "  • Steam: Launch 'RomM Sync' from your library"
         echo "  • Desktop Mode: Applications menu"
+        echo ""
+        echo "Or run from terminal: romm-sync --target steamdeck -s https://your-server.com -u admin -p password"
         echo "  • Gaming Mode: Steam library (after restart)"
         ;;
         

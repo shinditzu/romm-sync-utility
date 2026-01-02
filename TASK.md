@@ -40,6 +40,7 @@
 - [x] Improved installer pip handling - Multiple fallback methods including apt-get (2026-01-02)
 - [x] Fixed RetroPie installer - Now copies romm_sync.py to ~/romm-sync/ directory (2026-01-02)
 - [x] Standardized RetroPie config path - Now uses ~/.config/romm-sync/config like SteamDeck (2026-01-02)
+- [x] Added ES-DE tools integration - RomM Sync now accessible from ES-DE Tools menu on SteamDeck (2026-01-02)
 
 ## In Progress 🔄
 - None

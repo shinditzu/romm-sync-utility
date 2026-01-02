@@ -93,6 +93,16 @@ After installing pip, run the installer:
 - Python 3.7+
 - `requests` library
 
+## Running from SteamDeck
+
+The installer sets up **three ways** to run RomM Sync on SteamDeck:
+
+1. **From ES-DE (Recommended)**: Access from ES-DE → Tools → RomM Sync
+2. **From Steam**: Launch "RomM Sync" from your Steam library
+3. **From Desktop**: Use the desktop shortcut in Applications menu
+
+After installation, restart ES-DE to see the Tools menu entry.
+
 ## Running from RetroPie
 
 See **[RETROPIE_INTEGRATION.md](RETROPIE_INTEGRATION.md)** for detailed instructions on:
