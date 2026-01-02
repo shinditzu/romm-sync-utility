@@ -19,7 +19,6 @@ choice=$(zenity --list --title="RomM Sync" \
     --column="Option" \
     "Sync Favorites (Metadata + Images)" \
     "Sync Favorites + Download ROMs" \
-    "Sync All ROMs (Large!)" \
     --height=300 --width=400)
 
 case "$choice" in
@@ -30,7 +29,7 @@ case "$choice" in
             while IFS= read -r line; do
                 echo "# $line"
             done
-        ) | zenity --progress --pulsate --auto-close --no-cancel
+        ) | zenity --progress --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
         ;;
     "Sync Favorites + Download ROMs")
@@ -40,21 +39,8 @@ case "$choice" in
             while IFS= read -r line; do
                 echo "# $line"
             done
-        ) | zenity --progress --pulsate --auto-close --no-cancel
+        ) | zenity --progress --auto-close --no-cancel
         zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
-        ;;
-    "Sync All ROMs (Large!)")
-        zenity --question --text="This will sync ALL ROMs, not just favorites.\n\nThis could take a very long time and use a lot of storage.\n\nContinue?"
-        if [ $? -eq 0 ]; then
-            zenity --info --text="Starting full sync...\nThis will take a long time." --timeout=3
-            (
-                stdbuf -oL ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --all-roms --download-roms 2>&1 | \
-                while IFS= read -r line; do
-                    echo "# $line"
-                done
-            ) | zenity --progress --pulsate --auto-close --no-cancel
-            zenity --info --text="Sync complete!\n\nRestart ES-DE to see changes."
-        fi
         ;;
     *)
         exit 0

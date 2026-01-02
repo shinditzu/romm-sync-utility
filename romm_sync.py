@@ -49,13 +49,6 @@ TARGET_CONFIGS = {
         "roms_path": "~/Emulation/roms",
         "image_subdir": "covers",  # ES-DE uses covers/ subdirectory
     },
-    "emudeck": {
-        "name": "EmuDeck (SteamDeck)",
-        "gamelist_path": "~/.emulationstation/gamelists",
-        "images_path": "~/.emulationstation/downloaded_media",
-        "roms_path": "CUSTOM",  # User must specify with --rom-path
-        "image_subdir": "covers",  # ES-DE uses covers/ subdirectory
-    },
 }
 
 # Default gamelist output path (for backward compatibility)
