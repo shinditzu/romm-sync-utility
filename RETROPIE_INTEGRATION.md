@@ -19,7 +19,7 @@ The installer automatically sets up everything for you:
 ssh pi@retropie
 
 # Clone or copy the repository
-git clone https://github.com/yourusername/romm-sync-utility.git
+git clone https://github.com/shinditzu/romm-sync-utility.git
 cd romm-sync-utility
 
 # Run the installer

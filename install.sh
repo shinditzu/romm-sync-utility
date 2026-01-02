@@ -101,21 +101,32 @@ fi
 # Install requests library (skip for SteamDeck - will be installed in venv)
 if [ "$SYSTEM_TYPE" != "steamdeck" ]; then
     print_status "Installing Python dependencies..."
-    if pip3 install --user requests --quiet 2>/dev/null; then
+    
+    # Try method 1: pip3 install --user
+    if pip3 install --user requests 2>/dev/null; then
         print_success "Installed 'requests' library"
     else
-        print_warning "Failed to install via pip3, trying alternative method..."
+        print_warning "Failed to install via pip3, trying alternative methods..."
         
-        # Try using ensurepip if pip install failed
-        if python3 -m pip install --user requests --quiet 2>/dev/null; then
+        # Try method 2: python3 -m pip install --user
+        if python3 -m pip install --user requests 2>/dev/null; then
             print_success "Installed 'requests' library using python3 -m pip"
+        # Try method 3: apt-get install python3-requests
+        elif sudo apt-get install -y python3-requests 2>/dev/null; then
+            print_success "Installed 'requests' library via apt-get"
+        # Try method 4: pip3 without --user flag
+        elif sudo pip3 install requests 2>/dev/null; then
+            print_success "Installed 'requests' library globally"
         else
             print_error "Failed to install 'requests' library"
             echo ""
-            echo "Please install manually:"
-            echo "  pip3 install --user requests"
-            echo "Or:"
-            echo "  python3 -m pip install --user requests"
+            echo "Please try one of these methods manually:"
+            echo "  1. sudo apt-get install python3-requests"
+            echo "  2. pip3 install --user requests"
+            echo "  3. python3 -m pip install --user requests"
+            echo "  4. sudo pip3 install requests"
+            echo ""
+            echo "After installing, run the installer again."
             exit 1
         fi
     fi
