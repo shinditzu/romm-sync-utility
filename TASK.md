@@ -30,6 +30,8 @@
 - [x] Removed hardcoded path defaults - Only uses paths from ES-DE configuration (2026-01-01)
 - [x] Fixed ROM path generation - Correctly includes /roms/ in gamelist paths (2026-01-01)
 - [x] Removed emudeck target - Simplified to retropie and steamdeck only (2026-01-01)
+- [x] Logging to file - Logs written to romm-sync directory with timestamps (2026-01-02)
+- [x] Removed all-roms option from SteamDeck menu - Only favorites sync available in UI (2026-01-02)
 
 ## In Progress 🔄
 - None
@@ -46,5 +48,4 @@
 - Parallel downloads (threading/async)
 - Backup existing gamelist.xml before overwrite
 - Support for custom platform mappings via config file
-- Logging to file
 - Unit tests

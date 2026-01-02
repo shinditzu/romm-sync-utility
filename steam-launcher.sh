@@ -19,7 +19,7 @@ choice=$(zenity --list --title="RomM Sync" \
     --column="Option" \
     "Sync Favorites (Metadata + Images)" \
     "Sync Favorites + Download ROMs" \
-    --height=300 --width=400)
+    --height=250 --width=400)
 
 case "$choice" in
     "Sync Favorites (Metadata + Images)")

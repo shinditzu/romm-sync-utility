@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 import re
 from typing import Optional
+import logging
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter
@@ -31,6 +32,31 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(line_buffering=True)
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(line_buffering=True)
+
+
+def setup_logging():
+    """
+    Configure logging to write to both file and console.
+    
+    Log files are stored in the ~/romm-sync directory with timestamps.
+    """
+    log_dir = Path.home() / "romm-sync"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"romm-sync_{timestamp}.log"
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    logging.info(f"Log file: {log_file}")
+    return log_file
 
 
 # Target system configurations
@@ -1014,9 +1040,12 @@ Examples:
 
     args = parser.parse_args()
 
+    # Setup logging
+    setup_logging()
+
     # Get target configuration (make a copy so we can modify it)
     target_config = TARGET_CONFIGS[args.target].copy()
-    print(f"Target system: {target_config['name']}")
+    logging.info(f"Target system: {target_config['name']}")
     
     # Auto-detect paths from ES-DE if not disabled
     if not args.no_auto_detect and args.target == "steamdeck":
