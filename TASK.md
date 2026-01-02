@@ -32,6 +32,8 @@
 - [x] Removed emudeck target - Simplified to retropie and steamdeck only (2026-01-01)
 - [x] Logging to file - Logs written to romm-sync directory with timestamps (2026-01-02)
 - [x] Removed all-roms option from SteamDeck menu - Only favorites sync available in UI (2026-01-02)
+- [x] Refactored installer to copy steam-launcher.sh instead of generating inline (2026-01-02)
+- [x] Detailed file operation logging - Logs all directory creation, file downloads, and deletions (2026-01-02)
 
 ## In Progress 🔄
 - None

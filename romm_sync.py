@@ -339,6 +339,7 @@ class RomMClient:
             if show_progress and total_size > 0:
                 print()  # New line after progress
             
+            logging.info(f"Downloaded ROM file: {output_path} ({format_bytes(downloaded)})")
             return True
         except Exception as e:
             if show_progress:
@@ -586,8 +587,10 @@ def remove_unfavorited_games(
                 try:
                     rom_file.unlink()
                     removed_roms += 1
+                    logging.info(f"Deleted ROM file: {rom_file}")
                     print(f"      Deleted ROM: {rom_filename}")
                 except Exception as e:
+                    logging.error(f"Error deleting ROM {rom_file}: {e}")
                     print(f"      Error deleting ROM {rom_filename}: {e}")
         
         # Remove image file
@@ -600,8 +603,10 @@ def remove_unfavorited_games(
                 try:
                     image_file.unlink()
                     removed_images += 1
+                    logging.info(f"Deleted image file: {image_file}")
                     print(f"      Deleted image: {image_filename}")
                 except Exception as e:
+                    logging.error(f"Error deleting image {image_file}: {e}")
                     print(f"      Error deleting image {image_filename}: {e}")
     
     return (removed_roms, removed_images)
@@ -625,6 +630,7 @@ def download_image(client: RomMClient, rom: dict, dest_path: Path, max_retries: 
             response.raise_for_status()
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             dest_path.write_bytes(response.content)
+            logging.info(f"Downloaded image: {dest_path}")
             return True
         except requests.HTTPError as e:
             if e.response.status_code == 401:
@@ -778,7 +784,11 @@ def sync_platform(
         return len(roms)
 
     # Create platform directory if needed
-    platform_path.mkdir(parents=True, exist_ok=True)
+    if not platform_path.exists():
+        platform_path.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Created gamelist directory: {platform_path}")
+    else:
+        logging.info(f"Using existing gamelist directory: {platform_path}")
     
     # Use target-specific paths
     home_dir = Path.home()
@@ -812,7 +822,11 @@ def sync_platform(
             if removed_roms > 0 or removed_images > 0:
                 print(f"  Cleanup complete: {removed_roms} ROM(s) and {removed_images} image(s) removed")
     if download_images:
-        images_path.mkdir(parents=True, exist_ok=True)
+        if not images_path.exists():
+            images_path.mkdir(parents=True, exist_ok=True)
+            logging.info(f"Created images directory: {images_path}")
+        else:
+            logging.info(f"Using existing images directory: {images_path}")
         print("  Downloading cover images...")
         downloaded = 0
         skipped = 0
@@ -856,7 +870,11 @@ def sync_platform(
     # Download ROM files
     if download_roms and not dry_run:
         print(f"\n  Downloading ROM files to: {roms_path}")
-        roms_path.mkdir(parents=True, exist_ok=True)
+        if not roms_path.exists():
+            roms_path.mkdir(parents=True, exist_ok=True)
+            logging.info(f"Created ROMs directory: {roms_path}")
+        else:
+            logging.info(f"Using existing ROMs directory: {roms_path}")
         
         downloaded = 0
         skipped = 0
@@ -899,6 +917,7 @@ def sync_platform(
 
     xml_content = prettify_xml(gamelist)
     gamelist_path.write_text(xml_content, encoding="utf-8")
+    logging.info(f"Created gamelist.xml: {gamelist_path}")
     print(f"  Wrote {gamelist_path}")
 
     return len(roms)
