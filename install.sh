@@ -1,6 +1,6 @@
 #!/bin/bash
 # RomM Sync Utility - Universal Installer
-# Supports: RetroPie, SteamDeck (ES-DE), EmuDeck, and generic Linux systems
+# Supports: RetroPie, SteamDeck (ES-DE), and generic Linux systems
 
 set -e
 
@@ -44,10 +44,10 @@ print_warning() {
 detect_system() {
     if [ -d "$HOME/RetroPie" ]; then
         echo "retropie"
-    # elif [ -d "$HOME/Emulation" ] && [ -f "/etc/os-release" ] && grep -q "SteamOS" /etc/os-release; then
-    #     echo "steamdeck"
-    elif [ -d "/run/media/deck" ] && [ -d "$HOME/ES-DE" ]; then
-        echo "emudeck"
+    elif [ -f "/etc/os-release" ] && grep -q "SteamOS" /etc/os-release; then
+        echo "steamdeck"
+    elif [ -d "$HOME/ES-DE" ]; then
+        echo "steamdeck"
     else
         echo "generic"
     fi
@@ -79,7 +79,7 @@ if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" 
 fi
 
 # Check for pip (skip for SteamDeck - will use venv's pip)
-if [ "$SYSTEM_TYPE" != "steamdeck" ] && [ "$SYSTEM_TYPE" != "emudeck" ]; then
+if [ "$SYSTEM_TYPE" != "steamdeck" ]; then
     print_status "Checking for pip..."
     if ! command -v pip3 &> /dev/null; then
         print_warning "pip3 not found, attempting to install..."
@@ -99,7 +99,7 @@ else
 fi
 
 # Install requests library (skip for SteamDeck - will be installed in venv)
-if [ "$SYSTEM_TYPE" != "steamdeck" ] && [ "$SYSTEM_TYPE" != "emudeck" ]; then
+if [ "$SYSTEM_TYPE" != "steamdeck" ]; then
     print_status "Installing Python dependencies..."
     if pip3 install --user requests --quiet 2>/dev/null; then
         print_success "Installed 'requests' library"
@@ -149,7 +149,7 @@ EOF
 fi
 
 # SteamDeck wrapper
-if [ "$SYSTEM_TYPE" = "steamdeck" ] || [ "$SYSTEM_TYPE" = "emudeck" ]; then
+if [ "$SYSTEM_TYPE" = "steamdeck" ]; then
     cat > "$INSTALL_DIR/romm-sync-steamdeck" << 'EOF'
 #!/bin/bash
 exec "$HOME/.local/bin/romm-sync" --target steamdeck "$@"
@@ -278,7 +278,7 @@ XMLEOF
         echo "  EmulationStation → RetroPie → RomM Sync"
         ;;
         
-    steamdeck|emudeck)
+    steamdeck)
         print_status "Setting up SteamDeck integration (using venv)..."
         
         # Create romm-sync directory
@@ -436,15 +436,8 @@ DESKTOPEOF
         echo "Next steps:"
         echo "  1. Edit ~/.config/romm-sync/config.example with your RomM server details"
         echo "  2. Rename it to 'config' (mv ~/.config/romm-sync/config.example ~/.config/romm-sync/config)"
-        
-        if [ "$SYSTEM_TYPE" = "emudeck" ]; then
-            echo "  3. Find your Emulation path: ls -la /run/media/deck/*/Emulation"
-            echo "  4. Add ROM_PATH to your config file"
-            echo "  5. Launch 'RomM Sync' from Steam or Desktop Mode"
-        else
-            echo "  3. Launch 'RomM Sync' from Steam or Desktop Mode"
-            echo "  4. Or run from terminal: romm-sync --target steamdeck -s https://your-server.com -u admin -p password"
-        fi
+        echo "  3. Launch 'RomM Sync' from Steam or Desktop Mode"
+        echo "  4. Or run from terminal: romm-sync --target steamdeck -s https://your-server.com -u admin -p password"
         echo ""
         echo "The RomM Sync shortcut is available:"
         echo "  • Desktop Mode: Applications menu"
@@ -474,7 +467,7 @@ if [ "$SYSTEM_TYPE" = "retropie" ]; then
     echo "  • romm-sync-retropie  - RetroPie preset"
 fi
 
-if [ "$SYSTEM_TYPE" = "steamdeck" ] || [ "$SYSTEM_TYPE" = "emudeck" ]; then
+if [ "$SYSTEM_TYPE" = "steamdeck" ]; then
     echo "  • romm-sync-steamdeck - SteamDeck preset"
 fi
 
