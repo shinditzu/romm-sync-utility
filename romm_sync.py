@@ -1027,7 +1027,7 @@ Examples:
     print(f"Target system: {target_config['name']}")
     
     # Auto-detect paths from EmuDeck if not disabled
-    if not args.no_auto_detect and args.target in ["steamdeck", "emudeck"]:
+    if not args.no_auto_detect and args.target == "steamdeck":
         detected_paths = detect_emudeck_paths()
         
         # Use detected ROM path if not specified
@@ -1042,13 +1042,6 @@ Examples:
     
     if args.no_auto_detect:
         print("Auto-detection disabled - using standard ES-DE default paths")
-    
-    # Validate emudeck target requires --rom-path
-    if args.target == "emudeck" and not args.rom_path:
-        print("\nError: --target emudeck requires --rom-path to specify your Emulation directory")
-        print("Example: --rom-path /run/media/deck/SDCARD/Emulation")
-        print("\nTo find your path, run: ls -la /run/media/deck/*/Emulation")
-        sys.exit(1)
     
     # Use target-specific gamelist path if not overridden
     if args.output is None:
