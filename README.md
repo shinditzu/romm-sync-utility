@@ -4,13 +4,14 @@ Syncs ROM metadata from a [RomM](https://github.com/rommapp/romm) server to Emul
 
 **Supports:**
 - **RetroPie** - Raspberry Pi retro gaming distribution
-- **SteamDeck (ES-DE)** - EmulationStation Desktop Edition on SteamDeck
-- **EmuDeck** - SteamDeck with EmuDeck on external storage
+- **SteamDeck (ES-DE)** - EmulationStation Desktop Edition on SteamDeck with automatic path detection
 - Custom configurations via CLI flags
 
 ## Features
 
-- **Multi-target support** - RetroPie, SteamDeck (ES-DE), or custom paths
+- **Multi-target support** - RetroPie and SteamDeck (ES-DE)
+- **ES-DE auto-detection** - Automatically reads paths from ES-DE configuration
+- **ES-DE compatible image naming** - Images named to match ROM filenames
 - **Syncs favorites by default** - prevents accidental full library syncs
 - **Automatic cleanup** - removes ROMs and images when games are unfavorited
 - **Download ROM files** - optionally download actual ROM files from RomM server
@@ -122,22 +123,14 @@ python3 romm_sync.py -s https://your-romm-server.com -u admin -p password
 ```bash
 python3 romm_sync.py -s https://your-romm-server.com -u admin -p password --target steamdeck
 ```
-This uses ES-DE paths:
-- ROMs: `~/Emulation/roms/{platform}/`
-- Gamelists: `~/.emulationstation/gamelists/{platform}/`
-- Images: `~/.emulationstation/downloaded_media/{platform}/covers/`
+**Automatic Path Detection:**
+The script automatically reads your ES-DE configuration from `~/ES-DE/settings/es_settings.xml` and uses:
+- **ROMDirectory** - Your configured ROM path (e.g., `/run/media/deck/.../Emulation/roms/`)
+- **MediaDirectory** - Your configured media path (e.g., `/run/media/deck/.../Emulation/tools/downloaded_media/`)
+- **Gamelists** - Standard ES-DE location (`~/ES-DE/gamelists/{platform}/`)
 
-### EmuDeck (SteamDeck with external storage)
-```bash
-# First, find your Emulation path
-ls -la /run/media/deck/*/Emulation
-
-# Then sync with your actual path
-python3 romm_sync.py -s https://your-romm-server.com -u admin -p password \
-  --target emudeck \
-  --rom-path /run/media/deck/YOUR-SDCARD-ID/Emulation
-```
-EmuDeck typically installs ROMs on SD card or external storage. The `--rom-path` is **required** for EmuDeck target.
+**Image Naming:**
+Images are named to match ROM filenames (e.g., `game.zip` → `game.png`) for ES-DE compatibility.
 
 ### Sync specific platforms
 ```bash
@@ -201,14 +194,11 @@ python3 romm_sync.py -s https://your-romm-server.com -u admin -p password --down
 - **Images**: `~/.emulationstation/downloaded_images/{platform}/` - Cover art
 
 ### SteamDeck (ES-DE)
-- **ROMs**: `~/Emulation/roms/{platform}/` - Your actual game files
-- **Gamelists**: `~/.emulationstation/gamelists/{platform}/gamelist.xml` - Metadata files
-- **Images**: `~/.emulationstation/downloaded_media/{platform}/covers/` - Cover art
-
-### EmuDeck (External Storage)
-- **ROMs**: `/run/media/deck/SDCARD/Emulation/roms/{platform}/` - Your actual game files (on SD card)
-- **Gamelists**: `~/.emulationstation/gamelists/{platform}/gamelist.xml` - Metadata files
-- **Images**: `~/.emulationstation/downloaded_media/{platform}/covers/` - Cover art
+Paths are automatically detected from `~/ES-DE/settings/es_settings.xml`:
+- **ROMs**: Detected from `ROMDirectory` setting (typically `/run/media/deck/.../Emulation/roms/{platform}/`)
+- **Gamelists**: `~/ES-DE/gamelists/{platform}/gamelist.xml` - Standard ES-DE location
+- **Images**: Detected from `MediaDirectory` setting (typically `/run/media/deck/.../Emulation/tools/downloaded_media/{platform}/covers/`)
+- **Image naming**: Matches ROM filename (e.g., `game.zip` → `game.png`)
 
 ## ROM Path Configuration
 
@@ -246,7 +236,7 @@ Generates:
 │       └── gamelist.xml
 └── downloaded_images/
     ├── snes/
-    │   ├── 123-image.png
+    │   ├── Super Mario World (USA).png
     │   └── 456-image.png
     ├── nes/
     │   ├── 789-image.png
@@ -268,12 +258,12 @@ Generates:
 Use the `--target` flag to specify your system:
 
 - `--target retropie` (default) - RetroPie on Raspberry Pi
-- `--target steamdeck` - EmulationStation Desktop Edition on SteamDeck (internal storage)
-- `--target emudeck` - EmuDeck on SteamDeck with external storage (requires `--rom-path`)
+- `--target steamdeck` - EmulationStation Desktop Edition on SteamDeck (auto-detects paths from ES-DE settings)
 
 You can override individual paths with:
 - `-o` / `--output` - Custom gamelist output directory
-- `--rom-path` - Custom ROM base path for gamelist.xml (required for emudeck target)
+- `--rom-path` - Custom ROM base path for gamelist.xml
+- `--no-auto-detect` - Disable ES-DE path auto-detection (requires manual path configuration)
 
 ## Platform Mapping
 
@@ -330,13 +320,14 @@ python3 romm_sync.py -s https://your-romm-server.com -u admin -p password
 
 - **Default behavior**: Syncs ONLY favorites (use `--all-roms` to sync entire library)
 - **Automatic cleanup**: Removes unfavorited games' ROMs and images (favorites mode only)
-- **Target systems**: Use `--target retropie`, `--target steamdeck`, or `--target emudeck` to set appropriate paths
+- **Target systems**: Use `--target retropie` or `--target steamdeck`
+- **ES-DE path detection**: SteamDeck target automatically reads paths from `~/ES-DE/settings/es_settings.xml`
 - **ROM downloads**: Use `--download-roms` to download ROM files (paths vary by target)
 - **Kid-friendly games**: Create a "Kid Friendly" collection in RomM to automatically set `<kidgame>true</kidgame>` flag
 - **ROM paths**: Default is relative (`./`). Use `--rom-path` for absolute paths when sharing filesystem with RomM
-- **Images**: Downloaded to target-specific paths (RetroPie: `downloaded_images/`, ES-DE: `downloaded_media/{platform}/covers/`)
+- **Images**: Downloaded to target-specific paths (RetroPie: `downloaded_images/`, ES-DE: auto-detected from settings)
 - **Skip existing files**: Both ROM files and images skip re-downloading if they already exist
-- **Image naming**: Uses ROM IDs to ensure uniqueness
+- **Image naming**: ES-DE uses ROM filename (e.g., `game.zip` → `game.png`), RetroPie uses ROM IDs
 - **Idempotent**: Existing images are skipped (no re-download)
 - **Rate limiting**: 0.5s delay every 10 downloads
 - **Retry logic**: 3 attempts with exponential backoff for failed requests

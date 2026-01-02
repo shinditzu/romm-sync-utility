@@ -25,6 +25,11 @@
 - [x] Fixed favorites collection detection - Proper error handling when no collection exists (2025-12-28)
 - [x] SteamDeck read-only filesystem handling - Uses venv to avoid system modifications (2025-12-28)
 - [x] Download progress display - Shows real-time progress for ROM and image downloads (2025-12-31)
+- [x] ES-DE path auto-detection - Reads MediaDirectory and ROMDirectory from ES-DE settings (2026-01-01)
+- [x] ES-DE image naming - Images named to match ROM filenames for ES-DE compatibility (2026-01-01)
+- [x] Removed hardcoded path defaults - Only uses paths from ES-DE configuration (2026-01-01)
+- [x] Fixed ROM path generation - Correctly includes /roms/ in gamelist paths (2026-01-01)
+- [x] Removed emudeck target - Simplified to retropie and steamdeck only (2026-01-01)
 
 ## In Progress 🔄
 - None

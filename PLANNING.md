@@ -4,23 +4,26 @@
 
 ### Core Components
 1. **RomMClient** - API client for RomM server with retry logic
-2. **Target Configuration** - Multi-target support (RetroPie, SteamDeck ES-DE, custom)
-3. **Platform Mapper** - Maps RomM slugs to EmulationStation folder names
-4. **XML Generator** - Creates EmulationStation gamelist.xml files
-5. **Image Downloader** - Downloads cover art with retry/rate limiting
+2. **Target Configuration** - Multi-target support (RetroPie, SteamDeck ES-DE)
+3. **ES-DE Path Detection** - Automatically reads paths from ES-DE settings.xml
+4. **Platform Mapper** - Maps RomM slugs to EmulationStation folder names
+5. **XML Generator** - Creates EmulationStation gamelist.xml files
+6. **Image Downloader** - Downloads cover art with retry/rate limiting
 
 ### Data Flow
 ```
-RomM API → RomMClient → Target Config Selection → Platform Sync → XML Generation + Image Download → Target-Specific Folders
+RomM API → RomMClient → Target Config Selection → ES-DE Path Detection (if steamdeck) → Platform Sync → XML Generation + Image Download → Target-Specific Folders
 ```
 
 ## Design Decisions
 
 ### Multi-Target Support
 - Target configurations stored in `TARGET_CONFIGS` dict
-- Each target defines: gamelist_path, images_path, roms_path, image_subdir
-- Supports RetroPie and SteamDeck (ES-DE) out of the box
-- Extensible for additional targets (Batocera, Recalbox, etc.)
+- RetroPie: Uses hardcoded default paths
+- SteamDeck (ES-DE): Automatically detects paths from `~/ES-DE/settings/es_settings.xml`
+  - Reads `ROMDirectory` and `MediaDirectory` settings
+  - Uses standard gamelist location (`~/ES-DE/gamelists/`)
+  - No hardcoded defaults to prevent creating unused directories
 
 ### File Structure
 - Single-file script for portability
@@ -38,7 +41,8 @@ RomM API → RomMClient → Target Config Selection → Platform Sync → XML Ge
 - Timeout: 120s for ROM lists, 180s for large queries, 30s for images
 
 ### Image Handling
-- Use ROM ID for filenames (ensures uniqueness)
+- **ES-DE**: Images named to match ROM filenames (e.g., `game.zip` → `game.png`)
+- **RetroPie**: Uses ROM ID for filenames (ensures uniqueness)
 - Prefer external URLs (IGDB) over local server
 - Skip existing images (idempotent)
 - PNG format for all covers

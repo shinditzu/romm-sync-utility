@@ -101,25 +101,19 @@ See what would be synced without making changes:
 
 ## 💾 Storage Locations
 
-### Auto-Detection (EmuDeck Users)
-If you have EmuDeck installed, ROM paths are detected automatically. No configuration needed!
+### Automatic Path Detection
+The script automatically detects your ES-DE configuration from `~/ES-DE/settings/es_settings.xml`:
 
-### Manual Path Configuration
+- **ROMs**: Reads `ROMDirectory` setting (e.g., `/run/media/deck/.../Emulation/roms/`)
+- **Images**: Reads `MediaDirectory` setting (e.g., `/run/media/deck/.../Emulation/tools/downloaded_media/`)
+- **Gamelists**: Standard ES-DE location (`~/ES-DE/gamelists/{platform}/`)
 
-**Internal Storage (Default):**
-- ROMs: `~/Emulation/roms/`
-- Metadata: `~/.emulationstation/gamelists/`
-- Images: `~/.emulationstation/downloaded_media/`
+**No configuration needed!** The script uses whatever paths ES-DE is already configured to use.
 
-**SD Card:**
-If your ROMs are on an SD card, specify the path:
-```bash
-~/romm-sync/romm-sync -s https://your-server.com -u admin -p password --target steamdeck --rom-path /run/media/mmcblk0p1/Emulation
-```
-
-Common SD card paths:
-- `/run/media/mmcblk0p1/Emulation/`
-- `/run/media/deck/SDCARD/Emulation/`
+### Image Naming
+Images are automatically named to match your ROM filenames for ES-DE compatibility:
+- ROM: `Super Mario World (USA).sfc` → Image: `Super Mario World (USA).png`
+- ROM: `abcop.zip` → Image: `abcop.png`
 
 ---
 
@@ -134,6 +128,7 @@ Common SD card paths:
 ✅ **Cover Art**
 - High-quality box art from IGDB
 - Automatically downloaded and organized
+- Named to match ROM filenames for ES-DE compatibility
 
 ✅ **ROM Files** (Optional)
 - Download actual game files from RomM
@@ -154,10 +149,10 @@ Common SD card paths:
 **Solution 2: Check Files Were Created**
 ```bash
 # Check if gamelist files exist
-ls ~/.emulationstation/gamelists/*/gamelist.xml
+ls ~/ES-DE/gamelists/*/gamelist.xml
 
-# Check if images were downloaded
-ls ~/.emulationstation/downloaded_media/snes/covers/
+# Check if images were downloaded (path from your ES-DE settings)
+ls /run/media/deck/*/Emulation/tools/downloaded_media/snes/covers/
 ```
 
 **Solution 3: Verify Favorites in RomM**
@@ -194,26 +189,15 @@ curl https://your-romm-server.com
 - Check firewall settings on your RomM server
 - Verify username and password are correct
 
-### SD Card Not Detected
+### ES-DE Settings Not Found
 
-**Find your SD card path:**
+If the script can't find your ES-DE settings:
 ```bash
-ls /run/media/
+# Check if ES-DE settings exist
+ls ~/ES-DE/settings/es_settings.xml
 ```
 
-Then use the full path:
-```bash
---rom-path /run/media/YOUR-SD-CARD-NAME/Emulation
-```
-
-### Permission Errors
-
-```bash
-# Create directories if they don't exist
-mkdir -p ~/Emulation/roms
-mkdir -p ~/.emulationstation/gamelists
-mkdir -p ~/.emulationstation/downloaded_media
-```
+If the file doesn't exist, run ES-DE at least once to generate the configuration file.
 
 ---
 
@@ -261,6 +245,8 @@ The installer will update everything automatically.
 
 ## 📝 Important Notes
 
+- ✅ **Automatic path detection**: Reads paths from ES-DE configuration
+- ✅ **ES-DE compatible naming**: Images match ROM filenames
 - ✅ **Favorites by default**: Only syncs ROMs in your "Favourites" collection
 - ✅ **Safe to re-run**: Skips existing files, won't duplicate
 - ✅ **Network required**: Must have access to your RomM server
@@ -274,5 +260,6 @@ The installer will update everything automatically.
 If you're still having issues:
 1. Check the troubleshooting section above
 2. Run with `--dry-run` to see what would happen
-3. Check ES-DE logs: `~/.emulationstation/es_log.txt`
-4. Open an issue on GitHub with your error message
+3. Verify ES-DE settings exist: `~/ES-DE/settings/es_settings.xml`
+4. Check ES-DE logs: `~/ES-DE/logs/` (or `~/.emulationstation/es_log.txt`)
+5. Open an issue on GitHub with your error message
