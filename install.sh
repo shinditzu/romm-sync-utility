@@ -46,6 +46,8 @@ detect_system() {
         echo "retropie"
     elif [ -d "$HOME/Emulation" ] && [ -f "/etc/os-release" ] && grep -q "SteamOS" /etc/os-release; then
         echo "steamdeck"
+    elif [ -d "/run/media/deck" ] && [ -d "$HOME/.config/EmuDeck" ]; then
+        echo "emudeck"
     else
         echo "generic"
     fi
