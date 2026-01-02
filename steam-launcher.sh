@@ -27,11 +27,12 @@ case "$choice" in
     "Sync Favorites (Metadata + Images)")
         # Run sync and capture output
         output=$(mktemp)
-        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | tee "$output" | \
-            zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites..." --auto-close --no-cancel &
         
-        # Wait for sync to complete
-        wait
+        # Run sync in background and show progress
+        (
+            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | tee "$output"
+            echo "100"
+        ) | zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites..." --auto-close --no-cancel
         
         # Show detailed results
         zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
@@ -40,11 +41,12 @@ case "$choice" in
     "Sync Favorites + Download ROMs")
         # Run sync and capture output
         output=$(mktemp)
-        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | tee "$output" | \
-            zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites and downloading ROMs..." --auto-close --no-cancel &
         
-        # Wait for sync to complete
-        wait
+        # Run sync in background and show progress
+        (
+            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | tee "$output"
+            echo "100"
+        ) | zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites and downloading ROMs..." --auto-close --no-cancel
         
         # Show detailed results
         zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
