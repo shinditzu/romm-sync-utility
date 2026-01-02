@@ -25,18 +25,9 @@ choice=$(zenity --list --title="RomM Sync" \
 
 case "$choice" in
     "Sync Favorites (Metadata + Images)")
-        # Run sync and capture output
-        output=$(mktemp)
-        
-        # Run sync in background and show progress
-        (
-            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | tee "$output"
-            echo "100"
-        ) | zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites..." --auto-close --no-cancel
-        
-        # Show detailed results
-        zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
-        rm -f "$output"
+        # Show output in real-time text window
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck 2>&1 | \
+            zenity --text-info --title="RomM Sync - Syncing Favorites" --width=900 --height=700 --auto-scroll
         
         # Ask to restart ES-DE
         if zenity --question --text="Sync complete!\n\nRestart ES-DE to see changes?"; then
@@ -44,18 +35,9 @@ case "$choice" in
         fi
         ;;
     "Sync Favorites + Download ROMs")
-        # Run sync and capture output
-        output=$(mktemp)
-        
-        # Run sync in background and show progress
-        (
-            ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | tee "$output"
-            echo "100"
-        ) | zenity --progress --pulsate --title="RomM Sync" --text="Syncing favorites and downloading ROMs..." --auto-close --no-cancel
-        
-        # Show detailed results
-        zenity --text-info --title="RomM Sync - Complete" --filename="$output" --width=800 --height=600
-        rm -f "$output"
+        # Show output in real-time text window
+        ~/romm-sync/romm-sync -s "$ROMM_SERVER" -u "$ROMM_USER" -p "$ROMM_PASSWORD" --target steamdeck --download-roms 2>&1 | \
+            zenity --text-info --title="RomM Sync - Syncing Favorites + Downloading ROMs" --width=900 --height=700 --auto-scroll
         
         # Ask to restart ES-DE
         if zenity --question --text="Sync complete!\n\nRestart ES-DE to see changes?"; then

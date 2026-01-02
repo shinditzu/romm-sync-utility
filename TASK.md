@@ -41,6 +41,8 @@
 - [x] Fixed RetroPie installer - Now copies romm_sync.py to ~/romm-sync/ directory (2026-01-02)
 - [x] Standardized RetroPie config path - Now uses ~/.config/romm-sync/config like SteamDeck (2026-01-02)
 - [x] Added ES-DE tools integration - RomM Sync now accessible from ES-DE Tools menu on SteamDeck (2026-01-02)
+- [x] Fixed ES-DE launcher black screen - Now uses live scrolling text like Steam launcher (2026-01-02)
+- [x] Prevented duplicate Steam shortcuts - Installer now checks if shortcut already exists (2026-01-02)
 
 ## In Progress 🔄
 - None
